@@ -10,7 +10,12 @@ import 'pages/login_page.dart';
 import 'pages/home_page.dart';
 import 'pages/create_box_page.dart';
 import 'pages/box_detail_page.dart';
+import 'pages/statistics_page.dart';
+import 'pages/help_page.dart';
+import 'pages/settings_page.dart';
 import 'controllers/auth_controller.dart';
+import 'controllers/subscription_controller.dart';
+import 'pages/subscription_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +24,9 @@ void main() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
+
+  Get.put(AuthController());
+  Get.put(SubscriptionController());
 
   runApp(const MagicBoxApp());
 }
@@ -29,9 +37,6 @@ class MagicBoxApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 初始化AuthController，确保登录状态
-    Get.put(AuthController());
-
     return GetMaterialApp(
       title: '魔盒',
       debugShowCheckedModeBanner: false,
@@ -46,6 +51,10 @@ class MagicBoxApp extends StatelessWidget {
         GetPage(name: '/create_box', page: () => const CreateBoxPage()),
         GetPage(
             name: '/box_detail', page: () => BoxDetailPage(box: Get.arguments)),
+        GetPage(name: '/statistics', page: () => StatisticsPage()),
+        GetPage(name: '/help', page: () => HelpPage()),
+        GetPage(name: '/settings', page: () => SettingsPage()),
+        GetPage(name: '/subscription', page: () => SubscriptionPage()),
       ],
     );
   }

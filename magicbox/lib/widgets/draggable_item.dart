@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import '../services/db_service.dart';
 
 class DraggableItemWidget extends StatefulWidget {
   final Offset initialPosition;
