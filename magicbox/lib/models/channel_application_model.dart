@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class ChannelApplicationModel {
   final int? id;
   final int userId;
@@ -132,4 +130,5 @@ class ChannelApplicationReviewModel {
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
-} 
+}
+

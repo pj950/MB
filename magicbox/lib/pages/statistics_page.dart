@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../controllers/statistics_controller.dart';
-import '../models/statistics_model.dart';
 
 class StatisticsPage extends StatelessWidget {
   final StatisticsController controller = Get.put(StatisticsController());
 
-  StatisticsPage({Key? key}) : super(key: key);
+  StatisticsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +217,8 @@ class StatisticsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDistributionChart(String title, Map<String, int> distribution, Color color) {
+  Widget _buildDistributionChart(
+      String title, Map<String, int> distribution, Color color) {
     final total = distribution.values.fold<int>(0, (sum, count) => sum + count);
     final items = distribution.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -239,7 +239,8 @@ class StatisticsPage extends StatelessWidget {
           child: PieChart(
             PieChartData(
               sections: items.map((entry) {
-                final percentage = (entry.value / total * 100).toStringAsFixed(1);
+                final percentage =
+                    (entry.value / total * 100).toStringAsFixed(1);
                 return PieChartSectionData(
                   value: entry.value.toDouble(),
                   title: '$percentage%',
@@ -277,4 +278,4 @@ class StatisticsPage extends StatelessWidget {
       ],
     );
   }
-} 
+}

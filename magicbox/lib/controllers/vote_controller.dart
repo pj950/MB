@@ -1,20 +1,21 @@
 import 'package:get/get.dart';
-import '../services/database_service.dart';
-import '../models/vote_model.dart';
-import '../models/vote_option_model.dart';
+import '../models/vote_model.dart' as vote_model;
+import '../models/vote_option_model.dart' as option_model;
 import '../models/vote_record_model.dart';
+import '../services/database_service.dart';
 import '../models/user_model.dart';
 
 class VoteController extends GetxController {
   final DatabaseService _databaseService = Get.find<DatabaseService>();
   final UserModel? currentUser = Get.find<UserModel?>();
 
-  final RxList<VoteModel> votes = <VoteModel>[].obs;
-  final RxList<VoteOptionModel> options = <VoteOptionModel>[].obs;
+  final RxList<vote_model.VoteModel> votes = <vote_model.VoteModel>[].obs;
+  final RxList<option_model.VoteOptionModel> options =
+      <option_model.VoteOptionModel>[].obs;
   final RxList<VoteRecordModel> records = <VoteRecordModel>[].obs;
   final RxBool isLoading = false.obs;
   final RxInt currentChannelId = 0.obs;
-  final Rx<VoteModel?> currentVote = Rx<VoteModel?>(null);
+  final Rx<vote_model.VoteModel?> currentVote = Rx<vote_model.VoteModel?>(null);
 
   @override
   void onInit() {
@@ -27,7 +28,8 @@ class VoteController extends GetxController {
 
     try {
       isLoading.value = true;
-      votes.value = await _databaseService.getChannelVotes(currentChannelId.value);
+      votes.value = await _databaseService
+          .getChannelVotes(currentChannelId.value.toString());
     } catch (e) {
       Get.snackbar(
         '错误',
@@ -42,11 +44,17 @@ class VoteController extends GetxController {
   Future<void> loadVoteDetails(int voteId) async {
     try {
       isLoading.value = true;
-      currentVote.value = await _databaseService.getVote(voteId);
+      currentVote.value = await _databaseService.getVote(voteId.toString());
       if (currentVote.value != null) {
-        options.value = await _databaseService.getVoteOptions(voteId);
+        final optionsList =
+            await _databaseService.getVoteOptions(voteId.toString());
+        options.value = optionsList.cast<option_model.VoteOptionModel>();
         if (currentUser != null) {
-          records.value = await _databaseService.getUserVoteRecords(currentUser!.id!, voteId);
+          final recordsList = await _databaseService.getUserVoteRecords(
+            currentUser!.id!.toString(),
+            voteId.toString(),
+          );
+          records.value = recordsList.cast<VoteRecordModel>();
         }
       }
     } catch (e) {
@@ -82,9 +90,10 @@ class VoteController extends GetxController {
       isLoading.value = true;
 
       // 创建投票
-      final vote = VoteModel(
+      final newVote = vote_model.VoteModel(
+        id: DateTime.now().millisecondsSinceEpoch,
         channelId: currentChannelId.value,
-        creatorId: currentUser!.id!,
+        creatorId: int.parse(currentUser!.id!),
         title: title,
         description: description,
         startTime: startTime,
@@ -94,17 +103,19 @@ class VoteController extends GetxController {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      final voteId = await _databaseService.createVote(vote);
+      final voteId = await _databaseService.createVote(newVote);
 
       // 创建选项
       for (final content in optionContents) {
-        final option = VoteOptionModel(
+        final newOption = option_model.VoteOptionModel(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
           voteId: voteId,
           content: content,
+          voteCount: 0,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
-        await _databaseService.createVoteOption(option);
+        await _databaseService.createVoteOption(newOption);
       }
 
       Get.snackbar(
@@ -184,8 +195,8 @@ class VoteController extends GetxController {
 
       // 检查是否已投票
       final userRecords = await _databaseService.getUserVoteRecords(
-        currentUser!.id!,
-        currentVote.value!.id!,
+        currentUser!.id!.toString(),
+        currentVote.value!.id!.toString(),
       );
       if (userRecords.isNotEmpty) {
         Get.snackbar(
@@ -198,25 +209,26 @@ class VoteController extends GetxController {
 
       // 创建投票记录
       final record = VoteRecordModel(
-        voteId: currentVote.value!.id!,
-        userId: currentUser!.id!,
-        optionIds: optionIds,
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        voteId: currentVote.value!.id!.toString(),
+        optionId: optionIds.first.toString(),
+        userId: currentUser!.id!.toString(),
         createdAt: DateTime.now(),
       );
       await _databaseService.createVoteRecord(record);
 
       // 更新选项票数
       for (final optionId in optionIds) {
-        final option = options.firstWhere((o) => o.id == optionId);
+        final option = options.firstWhere((o) => o.id == optionId.toString());
         await _databaseService.updateVoteOptionCount(
-          optionId,
+          optionId.toString(),
           option.voteCount + 1,
         );
       }
 
       // 更新总票数
       await _databaseService.updateVoteTotalVotes(
-        currentVote.value!.id!,
+        currentVote.value!.id!.toString(),
         currentVote.value!.totalVotes + 1,
       );
 
@@ -247,7 +259,7 @@ class VoteController extends GetxController {
       return;
     }
 
-    final vote = await _databaseService.getVote(voteId);
+    final vote = await _databaseService.getVote(voteId.toString());
     if (vote == null) {
       Get.snackbar(
         '错误',
@@ -268,7 +280,7 @@ class VoteController extends GetxController {
 
     try {
       isLoading.value = true;
-      await _databaseService.updateVoteStatus(voteId, 'ended');
+      await _databaseService.updateVoteStatus(voteId.toString(), 'ended');
       Get.snackbar(
         '成功',
         '结束投票成功',
@@ -296,7 +308,7 @@ class VoteController extends GetxController {
       return;
     }
 
-    final vote = await _databaseService.getVote(voteId);
+    final vote = await _databaseService.getVote(voteId.toString());
     if (vote == null) {
       Get.snackbar(
         '错误',
@@ -317,7 +329,7 @@ class VoteController extends GetxController {
 
     try {
       isLoading.value = true;
-      await _databaseService.updateVoteStatus(voteId, 'cancelled');
+      await _databaseService.updateVoteStatus(voteId.toString(), 'cancelled');
       Get.snackbar(
         '成功',
         '取消投票成功',
@@ -341,13 +353,13 @@ class VoteController extends GetxController {
 
   List<int> getVotedOptionIds() {
     if (records.isEmpty) return [];
-    return records.first.optionIds;
+    return records.map((record) => int.parse(record.optionId)).toList();
   }
 
-  double getOptionPercentage(VoteOptionModel option) {
+  double getOptionPercentage(option_model.VoteOptionModel option) {
     if (currentVote.value == null || currentVote.value!.totalVotes == 0) {
       return 0;
     }
     return option.voteCount / currentVote.value!.totalVotes * 100;
   }
-} 
+}

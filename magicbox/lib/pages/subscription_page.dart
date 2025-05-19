@@ -6,7 +6,7 @@ import '../models/subscription_model.dart';
 class SubscriptionPage extends StatelessWidget {
   final SubscriptionController _controller = Get.find<SubscriptionController>();
 
-  SubscriptionPage({Key? key}) : super(key: key);
+  SubscriptionPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +65,7 @@ class SubscriptionPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _controller._getSubscriptionTypeName(subscription.type),
+                  _controller.getSubscriptionTypeName(subscription.type),
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -82,9 +82,15 @@ class SubscriptionPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             _buildBenefitItem('仓库数量', '${benefits['maxRepositories']} 个'),
-            _buildBenefitItem('每个仓库盒子数', benefits['maxBoxesPerRepository'] == -1 ? '无限制' : '${benefits['maxBoxesPerRepository']} 个'),
-            _buildBenefitItem('高级属性', benefits['hasAdvancedProperties'] ? '支持' : '不支持'),
-            _buildBenefitItem('水印保护', benefits['hasWatermarkProtection'] ? '支持' : '不支持'),
+            _buildBenefitItem(
+                '每个仓库盒子数',
+                benefits['maxBoxesPerRepository'] == -1
+                    ? '无限制'
+                    : '${benefits['maxBoxesPerRepository']} 个'),
+            _buildBenefitItem(
+                '高级属性', benefits['hasAdvancedProperties'] ? '支持' : '不支持'),
+            _buildBenefitItem(
+                '水印保护', benefits['hasWatermarkProtection'] ? '支持' : '不支持'),
             if (benefits['maxFamilyMembers'] > 0)
               _buildBenefitItem('家庭成员', '最多 ${benefits['maxFamilyMembers']} 人'),
             const SizedBox(height: 16),
@@ -134,7 +140,7 @@ class SubscriptionPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      _controller._getSubscriptionTypeName(type),
+                      _controller.getSubscriptionTypeName(type),
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -152,11 +158,18 @@ class SubscriptionPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _buildBenefitItem('仓库数量', '${benefits['maxRepositories']} 个'),
-                _buildBenefitItem('每个仓库盒子数', benefits['maxBoxesPerRepository'] == -1 ? '无限制' : '${benefits['maxBoxesPerRepository']} 个'),
-                _buildBenefitItem('高级属性', benefits['hasAdvancedProperties'] ? '支持' : '不支持'),
-                _buildBenefitItem('水印保护', benefits['hasWatermarkProtection'] ? '支持' : '不支持'),
+                _buildBenefitItem(
+                    '每个仓库盒子数',
+                    benefits['maxBoxesPerRepository'] == -1
+                        ? '无限制'
+                        : '${benefits['maxBoxesPerRepository']} 个'),
+                _buildBenefitItem(
+                    '高级属性', benefits['hasAdvancedProperties'] ? '支持' : '不支持'),
+                _buildBenefitItem(
+                    '水印保护', benefits['hasWatermarkProtection'] ? '支持' : '不支持'),
                 if (benefits['maxFamilyMembers'] > 0)
-                  _buildBenefitItem('家庭成员', '最多 ${benefits['maxFamilyMembers']} 人'),
+                  _buildBenefitItem(
+                      '家庭成员', '最多 ${benefits['maxFamilyMembers']} 人'),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -196,7 +209,7 @@ class SubscriptionPage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        if (subscription.familyMemberIds.isEmpty)
+        if (subscription.familyMemberIds?.isEmpty ?? true)
           const Center(
             child: Text('暂无家庭成员'),
           )
@@ -204,18 +217,18 @@ class SubscriptionPage extends StatelessWidget {
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: subscription.familyMemberIds.length,
+            itemCount: subscription.familyMemberIds?.length ?? 0,
             itemBuilder: (context, index) {
-              final memberId = subscription.familyMemberIds[index];
+              final memberId = subscription.familyMemberIds?[index];
               return ListTile(
                 leading: const CircleAvatar(
                   child: Icon(Icons.person),
                 ),
                 title: Text('成员 ${index + 1}'),
-                subtitle: Text(memberId),
+                subtitle: Text(memberId ?? '未知成员'),
                 trailing: IconButton(
                   icon: const Icon(Icons.remove_circle_outline),
-                  onPressed: () => _controller.removeFamilyMember(memberId),
+                  onPressed: () => _controller.removeFamilyMember(memberId ?? ''),
                 ),
               );
             },
@@ -254,4 +267,4 @@ class SubscriptionPage extends StatelessWidget {
       ),
     );
   }
-} 
+}

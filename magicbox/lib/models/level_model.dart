@@ -4,6 +4,8 @@ class LevelModel {
   final String title;
   final String description;
   final List<String> privileges;
+  final double pointsMultiplier;
+  final double coinsMultiplier;
 
   LevelModel({
     required this.level,
@@ -11,6 +13,8 @@ class LevelModel {
     required this.title,
     required this.description,
     required this.privileges,
+    this.pointsMultiplier = 1.0,
+    this.coinsMultiplier = 1.0,
   });
 
   LevelModel copyWith({
@@ -19,6 +23,8 @@ class LevelModel {
     String? title,
     String? description,
     List<String>? privileges,
+    double? pointsMultiplier,
+    double? coinsMultiplier,
   }) {
     return LevelModel(
       level: level ?? this.level,
@@ -26,6 +32,8 @@ class LevelModel {
       title: title ?? this.title,
       description: description ?? this.description,
       privileges: privileges ?? this.privileges,
+      pointsMultiplier: pointsMultiplier ?? this.pointsMultiplier,
+      coinsMultiplier: coinsMultiplier ?? this.coinsMultiplier,
     );
   }
 
@@ -36,6 +44,8 @@ class LevelModel {
       'title': title,
       'description': description,
       'privileges': privileges.join(','),
+      'points_multiplier': pointsMultiplier,
+      'coins_multiplier': coinsMultiplier,
     };
   }
 
@@ -46,12 +56,14 @@ class LevelModel {
       title: map['title'] as String,
       description: map['description'] as String,
       privileges: (map['privileges'] as String).split(','),
+      pointsMultiplier: map['points_multiplier'] as double? ?? 1.0,
+      coinsMultiplier: map['coins_multiplier'] as double? ?? 1.0,
     );
   }
 
   @override
   String toString() {
-    return 'LevelModel(level: $level, requiredExp: $requiredExp, title: $title, description: $description, privileges: $privileges)';
+    return 'LevelModel(level: $level, requiredExp: $requiredExp, title: $title, description: $description, privileges: $privileges, pointsMultiplier: $pointsMultiplier, coinsMultiplier: $coinsMultiplier)';
   }
 
   @override
@@ -63,7 +75,9 @@ class LevelModel {
       other.requiredExp == requiredExp &&
       other.title == title &&
       other.description == description &&
-      other.privileges == privileges;
+      other.privileges == privileges &&
+      other.pointsMultiplier == pointsMultiplier &&
+      other.coinsMultiplier == coinsMultiplier;
   }
 
   @override
@@ -72,7 +86,9 @@ class LevelModel {
       requiredExp.hashCode ^
       title.hashCode ^
       description.hashCode ^
-      privileges.hashCode;
+      privileges.hashCode ^
+      pointsMultiplier.hashCode ^
+      coinsMultiplier.hashCode;
   }
 }
 

@@ -54,7 +54,7 @@ class NotificationModel {
       'content': content,
       'target_type': targetType,
       'target_id': targetId,
-      'is_read': isRead ? 1 : 0,
+      'isread': isRead ? 1 : 0,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -68,7 +68,7 @@ class NotificationModel {
       content: map['content'] as String,
       targetType: map['target_type'] as String?,
       targetId: map['target_id'] as String?,
-      isRead: map['is_read'] == 1,
+      isRead: map['isread'] == 1,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
@@ -81,29 +81,29 @@ class NotificationModel {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-  
+
     return other is NotificationModel &&
-      other.id == id &&
-      other.userId == userId &&
-      other.type == type &&
-      other.title == title &&
-      other.content == content &&
-      other.targetType == targetType &&
-      other.targetId == targetId &&
-      other.isRead == isRead &&
-      other.createdAt == createdAt;
+        other.id == id &&
+        other.userId == userId &&
+        other.type == type &&
+        other.title == title &&
+        other.content == content &&
+        other.targetType == targetType &&
+        other.targetId == targetId &&
+        other.isRead == isRead &&
+        other.createdAt == createdAt;
   }
 
   @override
   int get hashCode {
     return id.hashCode ^
-      userId.hashCode ^
-      type.hashCode ^
-      title.hashCode ^
-      content.hashCode ^
-      targetType.hashCode ^
-      targetId.hashCode ^
-      isRead.hashCode ^
-      createdAt.hashCode;
+        userId.hashCode ^
+        type.hashCode ^
+        title.hashCode ^
+        content.hashCode ^
+        targetType.hashCode ^
+        targetId.hashCode ^
+        isRead.hashCode ^
+        createdAt.hashCode;
   }
-} 
+}

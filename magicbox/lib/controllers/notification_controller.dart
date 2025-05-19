@@ -21,8 +21,8 @@ class NotificationController extends GetxController {
   Future<void> loadNotifications() async {
     try {
       isLoading.value = true;
-      notifications.value = await _databaseService.getNotifications(currentUser.id);
-      unreadCount.value = await _databaseService.getUnreadNotificationCount(currentUser.id);
+      notifications.value = await _databaseService.getNotifications(currentUser.id.toString());
+      unreadCount.value = await _databaseService.getUnreadNotificationCount(currentUser.id.toString());
     } catch (e) {
       Get.snackbar('错误', '加载通知失败：$e');
     } finally {
@@ -36,7 +36,7 @@ class NotificationController extends GetxController {
       final index = notifications.indexWhere((n) => n.id == notificationId);
       if (index != -1) {
         notifications[index] = notifications[index].copyWith(isRead: true);
-        unreadCount.value = (unreadCount.value - 1).clamp(0, double.infinity);
+        unreadCount.value = (unreadCount.value - 1).clamp(0, double.infinity).toInt();
       }
     } catch (e) {
       Get.snackbar('错误', '标记通知已读失败：$e');
@@ -45,7 +45,7 @@ class NotificationController extends GetxController {
 
   Future<void> markAllAsRead() async {
     try {
-      await _databaseService.markAllNotificationsAsRead(currentUser.id);
+      await _databaseService.markAllNotificationsAsRead(currentUser.id.toString());
       notifications.value = notifications.map((n) => n.copyWith(isRead: true)).toList();
       unreadCount.value = 0;
     } catch (e) {
@@ -58,7 +58,7 @@ class NotificationController extends GetxController {
       await _databaseService.deleteNotification(notificationId);
       notifications.removeWhere((n) => n.id == notificationId);
       if (!notifications.any((n) => n.id == notificationId && !n.isRead)) {
-        unreadCount.value = (unreadCount.value - 1).clamp(0, double.infinity);
+        unreadCount.value = (unreadCount.value - 1).clamp(0, double.infinity).toInt();
       }
     } catch (e) {
       Get.snackbar('错误', '删除通知失败：$e');
@@ -67,7 +67,7 @@ class NotificationController extends GetxController {
 
   Future<void> deleteAllNotifications() async {
     try {
-      await _databaseService.deleteAllNotifications(currentUser.id);
+      await _databaseService.deleteAllNotifications(currentUser.id.toString());
       notifications.clear();
       unreadCount.value = 0;
     } catch (e) {
@@ -85,14 +85,14 @@ class NotificationController extends GetxController {
     try {
       final notification = NotificationModel(
         id: const Uuid().v4(),
-        userId: currentUser.id,
+        userId: currentUser.id.toString(),
         type: type,
         title: title,
         content: content,
         targetType: targetType,
         targetId: targetId,
         isRead: false,
-        createdAt: DateTime.now().toIso8601String(),
+        createdAt: DateTime.now(),
       );
 
       await _databaseService.createNotification(notification);

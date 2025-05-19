@@ -11,8 +11,8 @@ set(BINARY_NAME "magic_box_app")
 cmake_policy(VERSION 3.14...3.25)
 
 # Define build configuration option.
-get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-if(IS_MULTICONFIG)
+get_property(isMULTICONFIG GLOBAL PROPERTY GENERATOR_isMULTI_CONFIG)
+if(isMULTICONFIG)
   set(CMAKE_CONFIGURATION_TYPES "Debug;Profile;Release"
     CACHE STRING "" FORCE)
 else()

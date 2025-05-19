@@ -8,7 +8,7 @@ class ItemDetailPage extends StatelessWidget {
   final ItemModel item;
   final ItemController _controller = Get.find<ItemController>();
 
-  ItemDetailPage({Key? key, required this.item}) : super(key: key);
+  ItemDetailPage({super.key, required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +50,8 @@ class ItemDetailPage extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: GestureDetector(
-                        onTap: () => _showImageDialog(context, item.imageUrls[index]),
+                        onTap: () =>
+                            _showImageDialog(context, item.imageUrls[index]),
                         child: Image.file(
                           File(item.imageUrls[index]),
                           width: 200,
@@ -67,18 +68,16 @@ class ItemDetailPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (item.description != null) ...[
-                    const Text(
-                      '描述',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  const Text(
+                    '描述',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(height: 8),
-                    Text(item.description!),
-                    const SizedBox(height: 16),
-                  ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(item.description),
+                  const SizedBox(height: 16),
                   if (item.brand != null) ...[
                     const Text(
                       '品牌',
@@ -249,19 +248,20 @@ class ItemDetailPage extends StatelessWidget {
     final descriptionController = TextEditingController(text: item.description);
     final brandController = TextEditingController(text: item.brand);
     final modelController = TextEditingController(text: item.model);
-    final serialNumberController = TextEditingController(text: item.serialNumber);
+    final serialNumberController =
+        TextEditingController(text: item.serialNumber);
     final colorController = TextEditingController(text: item.color);
     final sizeController = TextEditingController(text: item.size);
-    final weightController = TextEditingController(
-        text: item.weight?.toString() ?? '');
-    final purchasePriceController = TextEditingController(
-        text: item.purchasePrice?.toString() ?? '');
-    final currentPriceController = TextEditingController(
-        text: item.currentPrice?.toString() ?? '');
+    final weightController =
+        TextEditingController(text: item.weight?.toString() ?? '');
+    final purchasePriceController =
+        TextEditingController(text: item.purchasePrice?.toString() ?? '');
+    final currentPriceController =
+        TextEditingController(text: item.currentPrice?.toString() ?? '');
     DateTime? purchaseDate = item.purchaseDate;
     int? conditionRating = item.conditionRating;
     bool isFavorite = item.isFavorite;
-    List<String> imageUrls = List.from(item.imageUrls);
+    final List<String> imageUrls = List.from(item.imageUrls);
 
     Get.dialog(
       AlertDialog(
@@ -446,7 +446,7 @@ class ItemDetailPage extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Get.back(),
+            onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
           ),
           ElevatedButton(
@@ -460,21 +460,16 @@ class ItemDetailPage extends StatelessWidget {
                 description: descriptionController.text.isEmpty
                     ? null
                     : descriptionController.text,
-                brand: brandController.text.isEmpty
-                    ? null
-                    : brandController.text,
-                model: modelController.text.isEmpty
-                    ? null
-                    : modelController.text,
+                brand:
+                    brandController.text.isEmpty ? null : brandController.text,
+                model:
+                    modelController.text.isEmpty ? null : modelController.text,
                 serialNumber: serialNumberController.text.isEmpty
                     ? null
                     : serialNumberController.text,
-                color: colorController.text.isEmpty
-                    ? null
-                    : colorController.text,
-                size: sizeController.text.isEmpty
-                    ? null
-                    : sizeController.text,
+                color:
+                    colorController.text.isEmpty ? null : colorController.text,
+                size: sizeController.text.isEmpty ? null : sizeController.text,
                 weight: weightController.text.isEmpty
                     ? null
                     : double.tryParse(weightController.text),
@@ -506,13 +501,13 @@ class ItemDetailPage extends StatelessWidget {
         content: const Text('确定要删除这个物品吗？此操作不可撤销。'),
         actions: [
           TextButton(
-            onPressed: () => Get.back(),
+            onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
           ),
           ElevatedButton(
             onPressed: () {
               Get.back();
-              _controller.deleteItem(item.id!);
+              _controller.deleteItem(item.id);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -523,4 +518,4 @@ class ItemDetailPage extends StatelessWidget {
       ),
     );
   }
-} 
+}

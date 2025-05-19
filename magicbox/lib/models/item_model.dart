@@ -1,5 +1,4 @@
 // lib/models/item_model.dart
-import 'package:uuid/uuid.dart';
 
 enum ItemStatus {
   ACTIVE,
@@ -9,13 +8,18 @@ enum ItemStatus {
 
 class ItemModel {
   final String id;
-  final String name;
   final String boxId;
-  final String? description;
-  final List<String> images;
+  final String name;
+  final String description;
+  final String imagePath;
+  final String note;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final Map<String, dynamic>? metadata;
+  final DateTime? expiryDate;
+  final double posX;
+  final double posY;
+  final double scale;
+  final String? watermarkText;
   final ItemStatus status;
   final bool isPublic;
   final Map<String, dynamic>? shareSettings;
@@ -24,17 +28,32 @@ class ItemModel {
   final bool isFavorite;
   final int viewCount;
   final int copyCount;
-  final String? watermarkText;
+  final List<String> imageUrls;
+  final String? brand;
+  final String? model;
+  final String? serialNumber;
+  final String? color;
+  final String? size;
+  final double? weight;
+  final double? purchasePrice;
+  final double? currentPrice;
+  final DateTime? purchaseDate;
+  final int? conditionRating;
 
   ItemModel({
-    String? id,
-    required this.name,
+    required this.id,
     required this.boxId,
-    this.description,
-    List<String>? images,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    this.metadata,
+    required this.name,
+    required this.description,
+    required this.imagePath,
+    this.note = '',
+    required this.createdAt,
+    required this.updatedAt,
+    this.expiryDate,
+    this.posX = 0.0,
+    this.posY = 0.0,
+    this.scale = 1.0,
+    this.watermarkText,
     this.status = ItemStatus.ACTIVE,
     this.isPublic = false,
     this.shareSettings,
@@ -43,65 +62,115 @@ class ItemModel {
     this.isFavorite = false,
     this.viewCount = 0,
     this.copyCount = 0,
-    this.watermarkText,
-  })  : id = id ?? const Uuid().v4(),
-        images = images ?? [],
-        createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now(),
-        tags = tags ?? [];
+    List<String>? imageUrls,
+    this.brand,
+    this.model,
+    this.serialNumber,
+    this.color,
+    this.size,
+    this.weight,
+    this.purchasePrice,
+    this.currentPrice,
+    this.purchaseDate,
+    this.conditionRating,
+  })  : tags = tags ?? [],
+        imageUrls = imageUrls ?? [];
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'name': name,
       'box_id': boxId,
+      'name': name,
       'description': description,
-      'images': images,
+      'image_path': imagePath,
+      'note': note,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
-      'metadata': metadata,
+      'expiry_date': expiryDate?.toIso8601String(),
+      'pos_x': posX,
+      'pos_y': posY,
+      'scale': scale,
+      'watermark_text': watermarkText,
       'status': status.toString(),
-      'is_public': isPublic,
+      'isPublic': isPublic ? 1 : 0,
       'share_settings': shareSettings,
       'advanced_properties': advancedProperties,
-      'tags': tags,
-      'is_favorite': isFavorite,
+      'tags': tags.join(','),
+      'isfavorite': isFavorite ? 1 : 0,
       'view_count': viewCount,
       'copy_count': copyCount,
-      'watermark_text': watermarkText,
+      'image_urls': imageUrls.join(','),
+      'brand': brand,
+      'model': model,
+      'serial_number': serialNumber,
+      'color': color,
+      'size': size,
+      'weight': weight,
+      'purchase_price': purchasePrice,
+      'current_price': currentPrice,
+      'purchase_date': purchaseDate?.toIso8601String(),
+      'condition_rating': conditionRating,
     };
   }
 
   factory ItemModel.fromMap(Map<String, dynamic> map) {
     return ItemModel(
-      id: map['id'],
-      name: map['name'],
-      boxId: map['box_id'],
-      description: map['description'],
-      images: List<String>.from(map['images'] ?? []),
-      createdAt: DateTime.parse(map['created_at']),
-      updatedAt: DateTime.parse(map['updated_at']),
-      metadata: map['metadata'],
+      id: map['id'] as String,
+      boxId: map['box_id'] as String,
+      name: map['name'] as String,
+      description: map['description'] as String,
+      imagePath: map['image_path'] as String,
+      note: map['note'] as String? ?? '',
+      createdAt: DateTime.parse(map['created_at'] as String),
+      updatedAt: DateTime.parse(map['updated_at'] as String),
+      expiryDate: map['expiry_date'] != null
+          ? DateTime.parse(map['expiry_date'] as String)
+          : null,
+      posX: (map['pos_x'] as num?)?.toDouble() ?? 0.0,
+      posY: (map['pos_y'] as num?)?.toDouble() ?? 0.0,
+      scale: (map['scale'] as num?)?.toDouble() ?? 1.0,
+      watermarkText: map['watermark_text'] as String?,
       status: ItemStatus.values.firstWhere(
         (e) => e.toString() == map['status'],
         orElse: () => ItemStatus.ACTIVE,
       ),
-      isPublic: map['is_public'] ?? false,
-      shareSettings: map['share_settings'],
-      advancedProperties: map['advanced_properties'],
-      tags: List<String>.from(map['tags'] ?? []),
-      isFavorite: map['is_favorite'] ?? false,
+      isPublic: map['isPublic'] == 1,
+      shareSettings: map['share_settings'] as Map<String, dynamic>?,
+      advancedProperties: map['advanced_properties'] as Map<String, dynamic>?,
+      tags: (map['tags'] as String?)?.split(',') ?? [],
+      isFavorite: map['isfavorite'] == 1,
       viewCount: map['view_count'] ?? 0,
       copyCount: map['copy_count'] ?? 0,
-      watermarkText: map['watermark_text'],
+      imageUrls: (map['image_urls'] as String?)?.split(',') ?? [],
+      brand: map['brand'] as String?,
+      model: map['model'] as String?,
+      serialNumber: map['serial_number'] as String?,
+      color: map['color'] as String?,
+      size: map['size'] as String?,
+      weight: (map['weight'] as num?)?.toDouble(),
+      purchasePrice: (map['purchase_price'] as num?)?.toDouble(),
+      currentPrice: (map['current_price'] as num?)?.toDouble(),
+      purchaseDate: map['purchase_date'] != null
+          ? DateTime.parse(map['purchase_date'] as String)
+          : null,
+      conditionRating: map['condition_rating'] as int?,
     );
   }
 
   ItemModel copyWith({
+    String? id,
+    String? boxId,
     String? name,
     String? description,
-    List<String>? images,
-    Map<String, dynamic>? metadata,
+    String? imagePath,
+    String? note,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? expiryDate,
+    double? posX,
+    double? posY,
+    double? scale,
+    String? watermarkText,
     ItemStatus? status,
     bool? isPublic,
     Map<String, dynamic>? shareSettings,
@@ -110,17 +179,32 @@ class ItemModel {
     bool? isFavorite,
     int? viewCount,
     int? copyCount,
-    String? watermarkText,
+    List<String>? imageUrls,
+    String? brand,
+    String? model,
+    String? serialNumber,
+    String? color,
+    String? size,
+    double? weight,
+    double? purchasePrice,
+    double? currentPrice,
+    DateTime? purchaseDate,
+    int? conditionRating,
   }) {
     return ItemModel(
-      id: id,
+      id: id ?? this.id,
+      boxId: boxId ?? this.boxId,
       name: name ?? this.name,
-      boxId: boxId,
       description: description ?? this.description,
-      images: images ?? this.images,
-      createdAt: createdAt,
-      updatedAt: DateTime.now(),
-      metadata: metadata ?? this.metadata,
+      imagePath: imagePath ?? this.imagePath,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      expiryDate: expiryDate ?? this.expiryDate,
+      posX: posX ?? this.posX,
+      posY: posY ?? this.posY,
+      scale: scale ?? this.scale,
+      watermarkText: watermarkText ?? this.watermarkText,
       status: status ?? this.status,
       isPublic: isPublic ?? this.isPublic,
       shareSettings: shareSettings ?? this.shareSettings,
@@ -129,7 +213,17 @@ class ItemModel {
       isFavorite: isFavorite ?? this.isFavorite,
       viewCount: viewCount ?? this.viewCount,
       copyCount: copyCount ?? this.copyCount,
-      watermarkText: watermarkText ?? this.watermarkText,
+      imageUrls: imageUrls ?? this.imageUrls,
+      brand: brand ?? this.brand,
+      model: model ?? this.model,
+      serialNumber: serialNumber ?? this.serialNumber,
+      color: color ?? this.color,
+      size: size ?? this.size,
+      weight: weight ?? this.weight,
+      purchasePrice: purchasePrice ?? this.purchasePrice,
+      currentPrice: currentPrice ?? this.currentPrice,
+      purchaseDate: purchaseDate ?? this.purchaseDate,
+      conditionRating: conditionRating ?? this.conditionRating,
     );
   }
 

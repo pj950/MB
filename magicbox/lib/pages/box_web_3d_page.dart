@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -23,7 +22,7 @@ class _BoxWeb3DPageState extends State<BoxWeb3DPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("3D 魔盒体验")),
+      appBar: AppBar(title: const Text('3D 魔盒体验')),
       body: WebViewWidget(controller: _controller),
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/settings_controller.dart';
-import '../models/settings_model.dart';
 
 class SettingsPage extends StatelessWidget {
   SettingsPage({super.key});
@@ -15,7 +14,7 @@ class SettingsPage extends StatelessWidget {
         title: const Text('设置'),
       ),
       body: Obx(() {
-        if (controller.isLoading) {
+        if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -27,7 +26,7 @@ class SettingsPage extends StatelessWidget {
                 _buildSwitchTile(
                   title: '深色模式',
                   value: controller.settings.value.darkMode,
-                  onChanged: controller.toggleDarkMode,
+                  onChanged: (value) => controller.toggleDarkMode(),
                 ),
                 _buildDropdownTile(
                   title: '字体大小',
@@ -37,7 +36,11 @@ class SettingsPage extends StatelessWidget {
                     DropdownMenuItem(value: 'medium', child: Text('中')),
                     DropdownMenuItem(value: 'large', child: Text('大')),
                   ],
-                  onChanged: controller.setFontSize,
+                  onChanged: (value) {
+                    if (value != null) {
+                      controller.setFontSize(value);
+                    }
+                  },
                 ),
               ],
             ),
@@ -47,17 +50,17 @@ class SettingsPage extends StatelessWidget {
                 _buildSwitchTile(
                   title: '启用通知',
                   value: controller.settings.value.notificationsEnabled,
-                  onChanged: controller.toggleNotifications,
+                  onChanged: (value) => controller.toggleNotifications(),
                 ),
                 _buildSwitchTile(
                   title: '声音',
                   value: controller.settings.value.soundEnabled,
-                  onChanged: controller.toggleSound,
+                  onChanged: (value) => controller.toggleSound(),
                 ),
                 _buildSwitchTile(
                   title: '震动',
                   value: controller.settings.value.vibrationEnabled,
-                  onChanged: controller.toggleVibration,
+                  onChanged: (value) => controller.toggleVibration(),
                 ),
               ],
             ),
@@ -67,12 +70,12 @@ class SettingsPage extends StatelessWidget {
                 _buildSwitchTile(
                   title: '自动播放视频',
                   value: controller.settings.value.autoPlayVideos,
-                  onChanged: controller.toggleAutoPlayVideos,
+                  onChanged: (value) => controller.toggleAutoPlayVideos(),
                 ),
                 _buildSwitchTile(
                   title: '省流量模式',
                   value: controller.settings.value.dataSaver,
-                  onChanged: controller.toggleDataSaver,
+                  onChanged: (value) => controller.toggleDataSaver(),
                 ),
               ],
             ),
@@ -83,15 +86,19 @@ class SettingsPage extends StatelessWidget {
                   title: '语言',
                   value: controller.settings.value.language,
                   items: const [
-                    DropdownMenuItem(value: 'zh', child: Text('简体中文')),
-                    DropdownMenuItem(value: 'en', child: Text('English')),
+                    DropdownMenuItem(value: 'zh_CN', child: Text('简体中文')),
+                    DropdownMenuItem(value: 'en_US', child: Text('English')),
                   ],
-                  onChanged: controller.setLanguage,
+                  onChanged: (value) {
+                    if (value != null) {
+                      controller.setLanguage(value);
+                    }
+                  },
                 ),
                 _buildSwitchTile(
                   title: '位置服务',
                   value: controller.settings.value.locationEnabled,
-                  onChanged: controller.toggleLocation,
+                  onChanged: (value) => controller.toggleLocation(),
                 ),
               ],
             ),
@@ -164,4 +171,4 @@ class SettingsPage extends StatelessWidget {
       ),
     );
   }
-} 
+}

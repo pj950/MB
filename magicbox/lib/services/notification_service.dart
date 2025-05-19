@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:flutter/material.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -30,11 +31,10 @@ class NotificationService {
   }
 
   void _onNotificationTapped(NotificationResponse response) {
-    // TODO: 处理通知点击事件
+    debugPrint('通知被点击: ${response.payload}');
   }
 
   Future<void> showNotification({
-    required int id,
     required String title,
     required String body,
     String? payload,
@@ -52,11 +52,16 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    await _notifications.show(id, title, body, details, payload: payload);
+    await _notifications.show(
+      DateTime.now().millisecond,
+      title,
+      body,
+      details,
+      payload: payload,
+    );
   }
 
   Future<void> scheduleNotification({
-    required int id,
     required String title,
     required String body,
     required DateTime scheduledDate,
@@ -76,20 +81,14 @@ class NotificationService {
     );
 
     await _notifications.zonedSchedule(
-      id,
+      DateTime.now().millisecond,
       title,
       body,
       tz.TZDateTime.from(scheduledDate, tz.local),
       details,
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: payload,
     );
-  }
-
-  Future<void> cancelNotification(int id) async {
-    await _notifications.cancel(id);
   }
 
   Future<void> cancelAllNotifications() async {

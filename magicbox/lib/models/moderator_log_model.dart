@@ -90,7 +90,7 @@ class ModeratorLogModel {
       'reason': reason,
       'metadata': metadata,
       'created_at': createdAt.toIso8601String(),
-      'is_reversed': isReversed,
+      'isreversed': isReversed,
       'reversed_by': reversedBy,
       'reversed_at': reversedAt?.toIso8601String(),
       'reversed_reason': reversedReason,
@@ -111,7 +111,7 @@ class ModeratorLogModel {
       reason: map['reason'] as String,
       metadata: map['metadata'] as Map<String, dynamic>?,
       createdAt: DateTime.parse(map['created_at'] as String),
-      isReversed: map['is_reversed'] as bool? ?? false,
+      isReversed: map['isreversed'] as bool? ?? false,
       reversedBy: map['reversed_by'] as String?,
       reversedAt: map['reversed_at'] != null
           ? DateTime.parse(map['reversed_at'] as String)
@@ -128,37 +128,37 @@ class ModeratorLogModel {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-  
+
     return other is ModeratorLogModel &&
-      other.id == id &&
-      other.moderatorId == moderatorId &&
-      other.channelId == channelId &&
-      other.action == action &&
-      other.targetType == targetType &&
-      other.targetId == targetId &&
-      other.reason == reason &&
-      other.metadata == metadata &&
-      other.createdAt == createdAt &&
-      other.isReversed == isReversed &&
-      other.reversedBy == reversedBy &&
-      other.reversedAt == reversedAt &&
-      other.reversedReason == reversedReason;
+        other.id == id &&
+        other.moderatorId == moderatorId &&
+        other.channelId == channelId &&
+        other.action == action &&
+        other.targetType == targetType &&
+        other.targetId == targetId &&
+        other.reason == reason &&
+        other.metadata == metadata &&
+        other.createdAt == createdAt &&
+        other.isReversed == isReversed &&
+        other.reversedBy == reversedBy &&
+        other.reversedAt == reversedAt &&
+        other.reversedReason == reversedReason;
   }
 
   @override
   int get hashCode {
     return id.hashCode ^
-      moderatorId.hashCode ^
-      channelId.hashCode ^
-      action.hashCode ^
-      targetType.hashCode ^
-      targetId.hashCode ^
-      reason.hashCode ^
-      metadata.hashCode ^
-      createdAt.hashCode ^
-      isReversed.hashCode ^
-      reversedBy.hashCode ^
-      reversedAt.hashCode ^
-      reversedReason.hashCode;
+        moderatorId.hashCode ^
+        channelId.hashCode ^
+        action.hashCode ^
+        targetType.hashCode ^
+        targetId.hashCode ^
+        reason.hashCode ^
+        metadata.hashCode ^
+        createdAt.hashCode ^
+        isReversed.hashCode ^
+        reversedBy.hashCode ^
+        reversedAt.hashCode ^
+        reversedReason.hashCode;
   }
-} 
+}

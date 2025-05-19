@@ -20,17 +20,18 @@ class LevelController extends GetxController {
   Future<void> loadLevelData() async {
     try {
       isLoading.value = true;
-      
+
       // 加载所有等级
       final allLevels = await _databaseService.getLevels();
       levels.value = allLevels;
-      
+
       // 加载用户等级信息
-      final userLevelData = await _databaseService.getUserLevel(_currentUser.id);
+      final userLevelData =
+          await _databaseService.getUserLevel(_currentUser.id.toString());
       if (userLevelData == null) {
         // 如果用户没有等级记录，创建初始等级
         final initialLevel = UserLevelModel(
-          userId: _currentUser.id,
+          userId: _currentUser.id.toString(),
           level: 1,
           exp: 0,
           totalExp: 0,
@@ -73,16 +74,16 @@ class LevelController extends GetxController {
   // 计算升级进度
   double getLevelProgress() {
     if (userLevel.value == null) return 0.0;
-    
+
     final currentLevel = getCurrentLevel();
     final nextLevel = getNextLevel();
-    
+
     if (currentLevel == null || nextLevel == null) return 1.0;
-    
+
     final currentExp = userLevel.value!.totalExp;
     final requiredExp = nextLevel.requiredExp - currentLevel.requiredExp;
     final userExp = currentExp - currentLevel.requiredExp;
-    
+
     return (userExp / requiredExp).clamp(0.0, 1.0);
   }
 
@@ -92,15 +93,16 @@ class LevelController extends GetxController {
 
     try {
       isLoading.value = true;
-      
+
       final oldLevel = userLevel.value!.level;
-      await _databaseService.addUserExp(_currentUser.id, exp);
-      
+      await _databaseService.addUserExp(_currentUser.id.toString(), exp);
+
       // 重新加载用户等级信息
-      final updatedUserLevel = await _databaseService.getUserLevel(_currentUser.id);
+      final updatedUserLevel =
+          await _databaseService.getUserLevel(_currentUser.id.toString());
       if (updatedUserLevel != null) {
         userLevel.value = updatedUserLevel;
-        
+
         // 如果升级了，显示升级提示
         if (updatedUserLevel.level > oldLevel) {
           final newLevel = getCurrentLevel();
@@ -131,4 +133,4 @@ class LevelController extends GetxController {
     if (currentLevel == null) return false;
     return currentLevel.privileges.contains(privilege);
   }
-} 
+}

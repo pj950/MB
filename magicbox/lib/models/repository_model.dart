@@ -1,134 +1,90 @@
 import 'package:uuid/uuid.dart';
 
-enum RepositoryType {
-  PERSONAL,
-  FAMILY,
-}
-
 class RepositoryModel {
   final String id;
+  final String userId;
   final String name;
-  final String? coverImage;
-  final String ownerId;
-  final RepositoryType type;
-  final int maxBoxes;
-  final int maxItems;
+  final String? description;
+  final bool isPublic;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final Map<String, dynamic>? metadata;
-  final bool isPublic;
-  final String? password;
-  final List<String> memberIds;
-  final Map<String, dynamic>? visualizationSettings;
+  final bool isActive;
+  final List<String> boxIds;
 
   RepositoryModel({
     String? id,
+    required this.userId,
     required this.name,
-    this.coverImage,
-    required this.ownerId,
-    required this.type,
-    required this.maxBoxes,
-    required this.maxItems,
+    this.description,
+    this.isPublic = false,
     DateTime? createdAt,
     DateTime? updatedAt,
-    this.metadata,
-    this.isPublic = false,
-    this.password,
-    List<String>? memberIds,
-    this.visualizationSettings,
+    required this.isActive,
+    required this.boxIds,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now(),
-        memberIds = memberIds ?? [];
+        updatedAt = updatedAt ?? DateTime.now();
+
+  int get boxCount => boxIds.length;
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'user_id': userId,
       'name': name,
-      'cover_image': coverImage,
-      'owner_id': ownerId,
-      'type': type.toString(),
-      'max_boxes': maxBoxes,
-      'max_items': maxItems,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-      'metadata': metadata,
-      'is_public': isPublic,
-      'password': password,
-      'member_ids': memberIds,
-      'visualization_settings': visualizationSettings,
+      'description': description,
+      'isPublic': isPublic ? 1 : 0,
+      'isActive': isActive ? 1 : 0,
+      'boxIds': boxIds.join(','),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
   factory RepositoryModel.fromMap(Map<String, dynamic> map) {
     return RepositoryModel(
-      id: map['id'],
-      name: map['name'],
-      coverImage: map['cover_image'],
-      ownerId: map['owner_id'],
-      type: RepositoryType.values.firstWhere(
-        (e) => e.toString() == map['type'],
-        orElse: () => RepositoryType.PERSONAL,
-      ),
-      maxBoxes: map['max_boxes'],
-      maxItems: map['max_items'],
-      createdAt: DateTime.parse(map['created_at']),
-      updatedAt: DateTime.parse(map['updated_at']),
-      metadata: map['metadata'],
-      isPublic: map['is_public'] ?? false,
-      password: map['password'],
-      memberIds: List<String>.from(map['member_ids'] ?? []),
-      visualizationSettings: map['visualization_settings'],
+      id: map['id']?.toString(),
+      userId: map['user_id']?.toString() ?? '',
+      name: map['name'] ?? '',
+      description: map['description']?.toString(),
+      isPublic: map['isPublic'] == 1,
+      isActive: map['isActive'] == 1,
+      boxIds: (map['boxIds'] as String?)?.split(',') ?? [],
+      createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(map['updatedAt'] ?? '') ?? DateTime.now(),
     );
   }
 
   RepositoryModel copyWith({
     String? name,
-    String? coverImage,
-    RepositoryType? type,
-    int? maxBoxes,
-    int? maxItems,
-    Map<String, dynamic>? metadata,
+    String? description,
     bool? isPublic,
-    String? password,
-    List<String>? memberIds,
-    Map<String, dynamic>? visualizationSettings,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isActive,
+    List<String>? boxIds,
   }) {
     return RepositoryModel(
       id: id,
+      userId: userId,
       name: name ?? this.name,
-      coverImage: coverImage ?? this.coverImage,
-      ownerId: ownerId,
-      type: type ?? this.type,
-      maxBoxes: maxBoxes ?? this.maxBoxes,
-      maxItems: maxItems ?? this.maxItems,
-      createdAt: createdAt,
-      updatedAt: DateTime.now(),
-      metadata: metadata ?? this.metadata,
+      description: description ?? this.description,
       isPublic: isPublic ?? this.isPublic,
-      password: password ?? this.password,
-      memberIds: memberIds ?? this.memberIds,
-      visualizationSettings: visualizationSettings ?? this.visualizationSettings,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isActive: isActive ?? this.isActive,
+      boxIds: boxIds ?? this.boxIds,
     );
-  }
-
-  // 检查是否达到盒子数量限制
-  bool hasReachedBoxLimit(int currentBoxCount) {
-    return currentBoxCount >= maxBoxes;
-  }
-
-  // 检查是否达到物品数量限制
-  bool hasReachedItemLimit(int currentItemCount) {
-    return currentItemCount >= maxItems;
   }
 
   // 检查用户是否有权限访问
   bool hasAccess(String userId) {
-    return ownerId == userId || memberIds.contains(userId);
+    if (isPublic) return true;
+    return this.userId == userId;
   }
 
   // 检查用户是否是管理员
   bool isAdmin(String userId) {
-    return ownerId == userId;
+    return this.userId == userId;
   }
-} 
+}

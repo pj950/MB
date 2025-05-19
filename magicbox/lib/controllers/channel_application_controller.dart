@@ -1,17 +1,20 @@
 import 'package:get/get.dart';
 import '../services/database_service.dart';
 import '../models/channel_application_model.dart';
-import '../models/channel_application_review_model.dart';
+import '../models/channel_application_review_model.dart' as review;
 import '../models/user_model.dart';
 
 class ChannelApplicationController extends GetxController {
   final DatabaseService _databaseService = Get.find<DatabaseService>();
   final UserModel? currentUser = Get.find<UserModel?>();
 
-  final RxList<ChannelApplicationModel> applications = <ChannelApplicationModel>[].obs;
-  final RxList<ChannelApplicationReviewModel> reviews = <ChannelApplicationReviewModel>[].obs;
+  final RxList<ChannelApplicationModel> applications =
+      <ChannelApplicationModel>[].obs;
+  final RxList<review.ChannelApplicationReviewModel> reviews =
+      <review.ChannelApplicationReviewModel>[].obs;
   final RxBool isLoading = false.obs;
-  final Rx<ChannelApplicationModel?> currentApplication = Rx<ChannelApplicationModel?>(null);
+  final Rx<ChannelApplicationModel?> currentApplication =
+      Rx<ChannelApplicationModel?>(null);
 
   @override
   void onInit() {
@@ -23,7 +26,7 @@ class ChannelApplicationController extends GetxController {
     try {
       isLoading.value = true;
       applications.value = await _databaseService.getChannelApplications(
-        userId: currentUser?.id,
+        userId: currentUser?.id != null ? int.tryParse(currentUser!.id!) : null,
       );
     } catch (e) {
       Get.snackbar(
@@ -39,9 +42,15 @@ class ChannelApplicationController extends GetxController {
   Future<void> loadApplicationDetails(int id) async {
     try {
       isLoading.value = true;
-      currentApplication.value = await _databaseService.getChannelApplication(id);
+      currentApplication.value =
+          await _databaseService.getChannelApplication(id);
       if (currentApplication.value != null) {
-        reviews.value = await _databaseService.getChannelApplicationReviews(id);
+        final reviewList =
+            await _databaseService.getChannelApplicationReviews(id);
+        reviews.value = reviewList
+            .map((item) =>
+                review.ChannelApplicationReviewModel.fromMap(item.toMap()))
+            .toList();
       }
     } catch (e) {
       Get.snackbar(
@@ -72,7 +81,7 @@ class ChannelApplicationController extends GetxController {
       isLoading.value = true;
 
       final application = ChannelApplicationModel(
-        userId: currentUser!.id!,
+        userId: int.parse(currentUser!.id!),
         name: name,
         description: description,
         category: category,
@@ -116,13 +125,15 @@ class ChannelApplicationController extends GetxController {
       await _databaseService.updateChannelApplicationStatus(id, 'approved');
 
       // 创建审核记录
-      final review = ChannelApplicationReviewModel(
-        applicationId: id,
-        reviewerId: currentUser!.id!,
-        action: 'approve',
-        createdAt: DateTime.now(),
+      final reviewModel = review.ChannelApplicationReviewModel(
+        channelId: id.toString(),
+        applicantId: currentApplication.value?.userId.toString() ?? '',
+        applicationContent: currentApplication.value?.description ?? '',
+        status: review.ApplicationStatus.APPROVED,
+        reviewerId: currentUser!.id!.toString(),
+        reviewedAt: DateTime.now(),
       );
-      await _databaseService.createChannelApplicationReview(review);
+      await _databaseService.createChannelApplicationReview(reviewModel);
 
       Get.snackbar(
         '成功',
@@ -162,14 +173,16 @@ class ChannelApplicationController extends GetxController {
       );
 
       // 创建审核记录
-      final review = ChannelApplicationReviewModel(
-        applicationId: id,
-        reviewerId: currentUser!.id!,
-        action: 'reject',
-        reason: reason,
-        createdAt: DateTime.now(),
+      final reviewModel = review.ChannelApplicationReviewModel(
+        channelId: id.toString(),
+        applicantId: currentApplication.value?.userId.toString() ?? '',
+        applicationContent: currentApplication.value?.description ?? '',
+        status: review.ApplicationStatus.REJECTED,
+        reviewerId: currentUser!.id!.toString(),
+        reviewNote: reason,
+        reviewedAt: DateTime.now(),
       );
-      await _databaseService.createChannelApplicationReview(review);
+      await _databaseService.createChannelApplicationReview(reviewModel);
 
       Get.snackbar(
         '成功',
@@ -189,6 +202,7 @@ class ChannelApplicationController extends GetxController {
   }
 
   bool isModerator() {
-    return currentUser?.role == 'moderator' || currentUser?.role == 'admin';
+    return currentUser?.type == UserType.ADMIN ||
+        currentUser?.type == UserType.MODERATOR;
   }
-} 
+}

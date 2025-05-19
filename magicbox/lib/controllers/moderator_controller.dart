@@ -3,6 +3,8 @@ import '../services/database_service.dart';
 import '../models/user_model.dart';
 import '../models/channel_model.dart';
 import '../models/content_report_model.dart';
+import '../models/moderator_application_model.dart' as app;
+import '../models/moderator_log_model.dart' as log;
 
 class ModeratorController extends GetxController {
   final DatabaseService _databaseService = Get.find<DatabaseService>();
@@ -11,6 +13,9 @@ class ModeratorController extends GetxController {
   final RxList<UserModel> moderators = <UserModel>[].obs;
   final RxList<ChannelModel> channels = <ChannelModel>[].obs;
   final RxList<ContentReportModel> reports = <ContentReportModel>[].obs;
+  final RxList<app.ModeratorApplicationModel> applications =
+      <app.ModeratorApplicationModel>[].obs;
+  final RxList<log.ModeratorLogModel> logs = <log.ModeratorLogModel>[].obs;
   final RxBool isLoading = false.obs;
 
   @override
@@ -18,17 +23,24 @@ class ModeratorController extends GetxController {
     super.onInit();
     if (isAdmin()) {
       loadModerators();
+      loadApplications();
+      loadLogs();
     }
     loadChannels();
     loadReports();
   }
 
   bool isAdmin() {
-    return currentUser?.role == 'admin';
+    return currentUser?.type == UserType.ADMIN;
   }
 
   bool isModerator() {
-    return currentUser?.role == 'moderator' || currentUser?.role == 'admin';
+    return currentUser?.type == UserType.MODERATOR ||
+        currentUser?.type == UserType.ADMIN;
+  }
+
+  bool isOwner(ChannelModel channel) {
+    return channel.ownerId == currentUser?.id.toString();
   }
 
   Future<void> loadModerators() async {
@@ -70,7 +82,9 @@ class ModeratorController extends GetxController {
 
     try {
       isLoading.value = true;
-      reports.value = await _databaseService.getContentReports(status: 'pending');
+      final List<dynamic> reportsList =
+          await _databaseService.getContentReports();
+      reports.value = reportsList.cast<ContentReportModel>();
     } catch (e) {
       Get.snackbar(
         '错误',
@@ -82,7 +96,45 @@ class ModeratorController extends GetxController {
     }
   }
 
-  Future<void> addModerator(int userId) async {
+  Future<void> loadApplications() async {
+    if (!isAdmin()) return;
+
+    try {
+      isLoading.value = true;
+      final List<dynamic> applicationsList =
+          await _databaseService.getModeratorApplications();
+      applications.value =
+          applicationsList.cast<app.ModeratorApplicationModel>();
+    } catch (e) {
+      Get.snackbar(
+        '错误',
+        '加载申请列表失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> loadLogs() async {
+    if (!isAdmin()) return;
+
+    try {
+      isLoading.value = true;
+      final List<dynamic> logsList = await _databaseService.getModeratorLogs();
+      logs.value = logsList.cast<log.ModeratorLogModel>();
+    } catch (e) {
+      Get.snackbar(
+        '错误',
+        '加载日志列表失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> addModerator(String userId) async {
     if (!isAdmin()) {
       Get.snackbar(
         '错误',
@@ -100,12 +152,12 @@ class ModeratorController extends GetxController {
         throw Exception('用户不存在');
       }
 
-      if (user.role == 'moderator' || user.role == 'admin') {
+      if (user.type == UserType.MODERATOR || user.type == UserType.ADMIN) {
         throw Exception('该用户已经是版主或管理员');
       }
 
       await _databaseService.updateUser(
-        user.copyWith(role: 'moderator'),
+        user.copyWith(type: UserType.MODERATOR),
       );
 
       Get.snackbar(
@@ -126,7 +178,7 @@ class ModeratorController extends GetxController {
     }
   }
 
-  Future<void> removeModerator(int userId) async {
+  Future<void> removeModerator(String userId) async {
     if (!isAdmin()) {
       Get.snackbar(
         '错误',
@@ -144,12 +196,12 @@ class ModeratorController extends GetxController {
         throw Exception('用户不存在');
       }
 
-      if (user.role != 'moderator') {
+      if (user.type != UserType.MODERATOR) {
         throw Exception('该用户不是版主');
       }
 
       await _databaseService.updateUser(
-        user.copyWith(role: 'user'),
+        user.copyWith(type: UserType.PERSONAL),
       );
 
       Get.snackbar(
@@ -189,7 +241,7 @@ class ModeratorController extends GetxController {
       }
 
       await _databaseService.updateChannel(
-        channel.copyWith(status: status),
+        channel.copyWith(isPrivate: status == 'private'),
       );
 
       Get.snackbar(
@@ -266,4 +318,166 @@ class ModeratorController extends GetxController {
       isLoading.value = false;
     }
   }
-} 
+
+  Future<void> applyForModerator(String reason) async {
+    if (currentUser == null) {
+      Get.snackbar(
+        '错误',
+        '请先登录',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+
+      final application = app.ModeratorApplicationModel(
+        id: null,
+        channelId: '0',
+        applicantId: currentUser!.id!.toString(),
+        applicationContent: reason,
+        status: app.ModeratorApplicationStatus.PENDING,
+        createdAt: DateTime.now(),
+      );
+
+      await _databaseService.createModeratorApplication(application);
+
+      Get.snackbar(
+        '成功',
+        '申请已提交',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      loadApplications();
+    } catch (e) {
+      Get.snackbar(
+        '错误',
+        '提交申请失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> approveApplication(
+      app.ModeratorApplicationModel application) async {
+    if (!isAdmin()) {
+      Get.snackbar(
+        '错误',
+        '权限不足',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+
+      final user = await _databaseService.getUser(application.applicantId);
+      if (user == null) {
+        throw Exception('用户不存在');
+      }
+
+      await _databaseService.updateUser(
+        user.copyWith(type: UserType.MODERATOR),
+      );
+
+      await _databaseService.updateModeratorApplicationStatus(
+        int.parse(application.id),
+        'approved',
+      );
+
+      Get.snackbar(
+        '成功',
+        '已批准申请',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      loadApplications();
+      loadModerators();
+    } catch (e) {
+      Get.snackbar(
+        '错误',
+        '批准申请失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> rejectApplication(
+      app.ModeratorApplicationModel application) async {
+    if (!isAdmin()) {
+      Get.snackbar(
+        '错误',
+        '权限不足',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+
+      await _databaseService.updateModeratorApplicationStatus(
+        int.parse(application.id),
+        'rejected',
+      );
+
+      Get.snackbar(
+        '成功',
+        '已拒绝申请',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      loadApplications();
+    } catch (e) {
+      Get.snackbar(
+        '错误',
+        '拒绝申请失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> updateModeratorPermissions(
+      UserModel moderator, Map<String, bool> permissions) async {
+    if (!isAdmin()) {
+      Get.snackbar(
+        '错误',
+        '权限不足',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+
+      await _databaseService.updateUser(
+        moderator.copyWith(moderatorPermissions: permissions),
+      );
+
+      Get.snackbar(
+        '成功',
+        '已更新权限',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      loadModerators();
+    } catch (e) {
+      Get.snackbar(
+        '错误',
+        '更新权限失败：$e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+}

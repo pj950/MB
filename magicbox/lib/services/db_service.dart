@@ -16,7 +16,7 @@ class DBService {
 
   // 初始化数据库
   static Future<Database> initDB() async {
-    String path = join(await getDatabasesPath(), 'magic_box.db');
+    final String path = join(await getDatabasesPath(), 'magic_box.db');
     return await openDatabase(path, version: 1, onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE boxes (
@@ -51,7 +51,7 @@ class DBService {
   // 获取所有盒子
   static Future<List<BoxModel>> getAllBoxes() async {
     final db = await database;
-    var res = await db.query('boxes');
+    final res = await db.query('boxes');
     return res.map((e) => BoxModel.fromMap(e)).toList();
   }
 
@@ -64,7 +64,7 @@ class DBService {
   // 根据盒子ID获取物品
   static Future<List<ItemModel>> getItemsByBoxId(int boxId) async {
     final db = await database;
-    var res = await db.query('items', where: 'boxId = ?', whereArgs: [boxId]);
+    final res = await db.query('items', where: 'boxId = ?', whereArgs: [boxId]);
     return res.map((e) => ItemModel.fromMap(e)).toList();
   }
 

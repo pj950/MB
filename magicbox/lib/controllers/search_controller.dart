@@ -3,12 +3,13 @@ import '../models/user_model.dart';
 import '../models/item_model.dart';
 import '../models/box_model.dart';
 import '../services/database_service.dart';
-import '../models/search_model.dart';
+import '../models/search_history_model.dart';
+import '../models/search_model.dart' show SearchResultModel;
 
 class SearchController extends GetxController {
   final DatabaseService _databaseService = Get.find<DatabaseService>();
   final UserModel _currentUser = Get.find<UserModel>();
-  
+
   final RxList<UserModel> _userResults = <UserModel>[].obs;
   final RxList<ItemModel> _itemResults = <ItemModel>[].obs;
   final RxList<BoxModel> _boxResults = <BoxModel>[].obs;
@@ -36,7 +37,8 @@ class SearchController extends GetxController {
   Future<void> loadSearchHistory() async {
     try {
       _isLoading.value = true;
-      final history = await _databaseService.getSearchHistory(_currentUser.id);
+      final history =
+          await _databaseService.getSearchHistory(_currentUser.id.toString());
       searchHistory.value = history;
     } catch (e) {
       Get.snackbar(
@@ -53,7 +55,7 @@ class SearchController extends GetxController {
   Future<void> clearSearchHistory() async {
     try {
       _isLoading.value = true;
-      await _databaseService.clearSearchHistory(_currentUser.id);
+      await _databaseService.clearSearchHistory(_currentUser.id.toString());
       searchHistory.clear();
       Get.snackbar(
         '成功',
@@ -83,7 +85,7 @@ class SearchController extends GetxController {
       // 添加搜索历史
       final history = SearchHistoryModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        userId: _currentUser.id,
+        userId: _currentUser.id.toString(),
         keyword: keyword,
         searchTime: DateTime.now(),
       );
@@ -91,15 +93,15 @@ class SearchController extends GetxController {
       searchHistory.insert(0, history);
 
       // 执行搜索
-      List<SearchResultModel> results = [];
+      final List<SearchResultModel> results = [];
       if (type == 'all' || type == 'post') {
-        results.addAll(await _databaseService.searchPosts(keyword));
+        results.addAll(await _databaseService.searchPosts(keyword) as Iterable<SearchResultModel>);
       }
       if (type == 'all' || type == 'channel') {
-        results.addAll(await _databaseService.searchChannels(keyword));
+        results.addAll(await _databaseService.searchChannels(keyword) as Iterable<SearchResultModel>);
       }
       if (type == 'all' || type == 'user') {
-        results.addAll(await _databaseService.searchUsers(keyword));
+        results.addAll(await _databaseService.searchUsers(keyword) as Iterable<SearchResultModel>);
       }
 
       // 按创建时间排序
@@ -140,4 +142,4 @@ class SearchController extends GetxController {
         break;
     }
   }
-} 
+}

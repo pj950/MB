@@ -25,7 +25,7 @@ class CheckinController extends GetxController {
       isLoading.value = true;
       
       // 加载签到历史
-      final history = await _databaseService.getCheckinHistory(_currentUser.id);
+      final history = await _databaseService.getCheckinHistory(_currentUser.id.toString());
       checkinHistory.value = history;
       
       // 计算连续签到天数
@@ -106,7 +106,7 @@ class CheckinController extends GetxController {
       // 创建签到记录
       final checkin = CheckinModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        userId: _currentUser.id,
+        userId: _currentUser.id.toString(),
         checkinDate: DateTime.now(),
         consecutiveDays: consecutiveDays.value + 1,
         pointsEarned: rewards['points']!,
@@ -118,11 +118,11 @@ class CheckinController extends GetxController {
       
       // 更新用户积分和金币
       await _databaseService.updateUserPoints(
-        _currentUser.id,
+        _currentUser.id.toString(),
         _currentUser.points + rewards['points']!,
       );
       await _databaseService.updateUserCoins(
-        _currentUser.id,
+        _currentUser.id.toString(),
         _currentUser.coins + rewards['coins']!,
       );
 
@@ -154,7 +154,7 @@ class CheckinController extends GetxController {
   }
 
   Map<String, int> _calculateRewards() {
-    final day = (consecutiveDays.value + 1) % 7;
+    int day = (consecutiveDays.value + 1) % 7;
     if (day == 0) day = 7;
 
     switch (day) {

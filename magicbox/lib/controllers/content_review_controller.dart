@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import '../services/database_service.dart';
-import '../models/content_report_model.dart';
+import '../models/content_report_model.dart' as report_model;
 import '../models/content_review_model.dart';
 import '../models/user_model.dart';
 
@@ -8,10 +8,12 @@ class ContentReviewController extends GetxController {
   final DatabaseService _databaseService = Get.find<DatabaseService>();
   final UserModel? currentUser = Get.find<UserModel?>();
 
-  final RxList<ContentReportModel> reports = <ContentReportModel>[].obs;
+  final RxList<report_model.ContentReportModel> reports =
+      <report_model.ContentReportModel>[].obs;
   final RxList<ContentReviewModel> reviews = <ContentReviewModel>[].obs;
   final RxBool isLoading = false.obs;
-  final Rx<ContentReportModel?> currentReport = Rx<ContentReportModel?>(null);
+  final Rx<report_model.ContentReportModel?> currentReport =
+      Rx<report_model.ContentReportModel?>(null);
 
   @override
   void onInit() {
@@ -22,7 +24,11 @@ class ContentReviewController extends GetxController {
   Future<void> loadReports({String? status}) async {
     try {
       isLoading.value = true;
-      reports.value = await _databaseService.getContentReports(status: status);
+      final List<dynamic> rawReports =
+          await _databaseService.getContentReports(status: status);
+      reports.value = rawReports
+          .map((r) => report_model.ContentReportModel.fromMap(r))
+          .toList();
     } catch (e) {
       Get.snackbar(
         '错误',
@@ -37,7 +43,10 @@ class ContentReviewController extends GetxController {
   Future<void> loadReportDetails(int id) async {
     try {
       isLoading.value = true;
-      currentReport.value = await _databaseService.getContentReport(id);
+      final rawReport = await _databaseService.getContentReport(id);
+      currentReport.value = rawReport != null
+          ? report_model.ContentReportModel.fromMap(rawReport.toMap())
+          : null;
       if (currentReport.value != null) {
         reviews.value = await _databaseService.getContentReviews(id);
       }
@@ -69,16 +78,16 @@ class ContentReviewController extends GetxController {
     try {
       isLoading.value = true;
 
-      final report = ContentReportModel(
-        reporterId: currentUser!.id!,
+      final newReport = report_model.ContentReportModel(
+        reporterId: currentUser!.id.toString(),
         targetType: targetType,
-        targetId: targetId,
-        reason: reason,
+        targetId: targetId.toString(),
+        type: report_model.ReportType.OTHER,
+        description: reason,
         createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
       );
 
-      await _databaseService.createContentReport(report);
+      await _databaseService.createContentReport(newReport);
 
       Get.snackbar(
         '成功',
@@ -117,7 +126,7 @@ class ContentReviewController extends GetxController {
       // 创建审核记录
       final review = ContentReviewModel(
         reportId: reportId,
-        reviewerId: currentUser!.id!,
+        reviewerId: int.parse(currentUser!.id!),
         action: action,
         note: note,
         createdAt: DateTime.now(),
@@ -160,6 +169,7 @@ class ContentReviewController extends GetxController {
   }
 
   bool isModerator() {
-    return currentUser?.role == 'moderator' || currentUser?.role == 'admin';
+    return currentUser?.type == UserType.MODERATOR ||
+        currentUser?.type == UserType.ADMIN;
   }
-} 
+}

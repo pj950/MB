@@ -11,17 +11,24 @@ import '../models/checkin_model.dart';
 import '../models/level_model.dart';
 import '../models/mall_item_model.dart';
 import '../models/order_model.dart';
-import '../models/moderator_model.dart';
-import '../models/moderator_application_model.dart';
-import '../models/moderator_log_model.dart';
-import '../models/channel_application_model.dart';
-import '../models/channel_application_review_model.dart';
-import '../models/content_report_model.dart';
-import '../models/content_review_model.dart';
+import '../models/moderator_model.dart' as mod;
+import '../models/moderator_application_model.dart' as app;
+import '../models/moderator_log_model.dart' as log;
+import '../models/channel_application_model.dart' as channel_app;
+import '../models/channel_application_review_model.dart' as channel_review;
+import '../models/content_report_model.dart' as report;
+import '../models/content_review_model.dart' as review;
 import '../models/search_history_model.dart';
 import '../models/search_result_model.dart';
 import '../models/notification_model.dart';
 import '../models/subscription_model.dart';
+import '../models/vote_model.dart' as vote;
+import '../models/vote_option_model.dart' as option;
+import '../models/vote_record_model.dart' as record;
+import '../models/repository_model.dart';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -31,449 +38,630 @@ class DatabaseService {
 
   DatabaseService._internal();
 
+  String hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   Future<Database> get database async {
-    if (_database != null) return _database!;
+    if (_database != null) {
+      try {
+        // 测试数据库连接是否有效
+        await _database!.rawQuery('SELECT 1');
+        return _database!;
+      } catch (e) {
+        print('数据库连接无效，尝试重新初始化...');
+        await initializeDatabase();
+        return _database!;
+      }
+    }
     _database = await _initDatabase();
     return _database!;
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'magicbox.db');
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createTables,
+    try {
+      print('开始初始化数据库...');
+      final dbPath = await getDatabasesPath();
+      print('数据库基础路径: $dbPath');
+      
+      final String path = join(dbPath, 'magicbox.db');
+      print('完整数据库路径: $path');
+
+      // 检查数据库文件是否存在
+      final dbFile = File(path);
+      if (await dbFile.exists()) {
+        print('数据库文件已存在');
+        print('文件大小: ${await dbFile.length()} 字节');
+        print('文件权限: ${await dbFile.stat()}');
+        
+        try {
+          // 尝试以读写模式打开文件
+          final file = await dbFile.open(mode: FileMode.write);
+          await file.close();
+          print('数据库文件权限正常，可以读写');
+        } catch (e) {
+          print('数据库文件权限异常: $e');
+          print('尝试删除并重新创建数据库文件...');
+          await dbFile.delete();
+          print('数据库文件已删除');
+        }
+      } else {
+        print('数据库文件不存在，将创建新文件');
+      }
+
+      // 确保数据库目录存在
+      try {
+        final dbDir = dirname(path);
+        print('数据库目录路径: $dbDir');
+        if (!await Directory(dbDir).exists()) {
+          print('创建数据库目录...');
+          await Directory(dbDir).create(recursive: true);
+          print('数据库目录创建成功');
+        } else {
+          print('数据库目录已存在');
+          print('目录权限: ${await Directory(dbDir).stat()}');
+        }
+      } catch (e) {
+        print('创建数据库目录失败: $e');
+        print('错误堆栈: ${StackTrace.current}');
+        rethrow;
+      }
+
+      try {
+        print('打开数据库连接...');
+        final db = await openDatabase(
+          path,
+          version: 3,
+          onCreate: (db, version) async {
+            print('开始创建数据库表，版本: $version');
+            try {
+              await _createTables(db, version);
+            } catch (e) {
+              print('创建数据库表失败: $e');
+              print('错误堆栈: ${StackTrace.current}');
+              rethrow;
+            }
+          },
+          onUpgrade: (db, oldVersion, newVersion) async {
+            print('开始升级数据库: $oldVersion -> $newVersion');
+            try {
+              await _onUpgrade(db, oldVersion, newVersion);
+            } catch (e) {
+              print('升级数据库失败: $e');
+              print('错误堆栈: ${StackTrace.current}');
+              rethrow;
+            }
+          },
+        );
+        print('数据库连接成功');
+
+        // 检查数据库表
+        print('检查数据库表...');
+        try {
+          final tables = await db
+              .query('sqlite_master', where: 'type = ?', whereArgs: ['table']);
+          print('现有数据库表: ${tables.map((t) => t['name']).join(', ')}');
+
+          // 检查用户表结构
+          print('检查用户表结构...');
+          final userColumns = await db.query('pragma_table_info("users")');
+          print('用户表列: ${userColumns.map((c) => c['name']).join(', ')}');
+
+          // 检查测试用户
+          print('检查测试用户...');
+          final testUser = await db
+              .query('users', where: 'username = ?', whereArgs: ['test']);
+          if (testUser.isEmpty) {
+            print('警告: 测试用户不存在');
+          } else {
+            print('测试用户存在: ${testUser.first}');
+          }
+        } catch (e) {
+          print('检查数据库表失败: $e');
+          print('错误堆栈: ${StackTrace.current}');
+          rethrow;
+        }
+
+        print('数据库初始化完成');
+        return db;
+      } catch (e) {
+        print('打开数据库连接失败: $e');
+        print('错误堆栈: ${StackTrace.current}');
+        // 如果数据库文件损坏，尝试删除并重新创建
+        if (await dbFile.exists()) {
+          print('尝试删除损坏的数据库文件...');
+          await dbFile.delete();
+          print('数据库文件已删除，将重新创建');
+          return _initDatabase(); // 递归调用，重新初始化
+        }
+        rethrow;
+      }
+    } catch (e) {
+      print('数据库初始化失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    print('数据库升级: $oldVersion -> $newVersion');
+    if (oldVersion < 2) {
+      // 添加新字段
+      await db.execute(
+          'ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT ""');
+      await db.execute(
+          'ALTER TABLE users ADD COLUMN createdAt TEXT NOT NULL DEFAULT ""');
+      await db.execute(
+          'ALTER TABLE users ADD COLUMN updatedAt TEXT NOT NULL DEFAULT ""');
+    }
+
+    if (oldVersion < 3) {
+      // 检查 boxes 表是否存在
+      final tables = await db.query('sqlite_master',
+          where: 'type = ? AND name = ?', whereArgs: ['table', 'boxes']);
+
+      if (tables.isEmpty) {
+        print('boxes 表不存在，创建新表...');
+        await db.execute('''
+          CREATE TABLE boxes (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            image_path TEXT,
+            type TEXT NOT NULL,
+            isPublic INTEGER NOT NULL DEFAULT 0,
+            isPinned INTEGER NOT NULL DEFAULT 0,
+            repository_id TEXT,
+            creator_id TEXT,
+            item_count INTEGER NOT NULL DEFAULT 0,
+            has_expired_items INTEGER NOT NULL DEFAULT 0,
+            order_index INTEGER NOT NULL DEFAULT 0,
+            theme_color TEXT,
+            access_level TEXT,
+            password TEXT,
+            allowed_user_ids TEXT,
+            share_settings TEXT,
+            advanced_properties TEXT,
+            tags TEXT,
+            view_count INTEGER NOT NULL DEFAULT 0,
+            copy_count INTEGER NOT NULL DEFAULT 0,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+          )
+        ''');
+        print('boxes 表创建完成');
+      } else {
+        print('boxes 表已存在，重新创建...');
+        await db.execute('DROP TABLE IF EXISTS boxes');
+        await db.execute('''
+          CREATE TABLE boxes (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            image_path TEXT,
+            type TEXT NOT NULL,
+            isPublic INTEGER NOT NULL DEFAULT 0,
+            isPinned INTEGER NOT NULL DEFAULT 0,
+            repository_id TEXT,
+            creator_id TEXT,
+            item_count INTEGER NOT NULL DEFAULT 0,
+            has_expired_items INTEGER NOT NULL DEFAULT 0,
+            order_index INTEGER NOT NULL DEFAULT 0,
+            theme_color TEXT,
+            access_level TEXT,
+            password TEXT,
+            allowed_user_ids TEXT,
+            share_settings TEXT,
+            advanced_properties TEXT,
+            tags TEXT,
+            view_count INTEGER NOT NULL DEFAULT 0,
+            copy_count INTEGER NOT NULL DEFAULT 0,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+          )
+        ''');
+        print('boxes 表重新创建完成');
+      }
+    }
+
+    // 检查测试用户是否存在
+    final List<Map<String, dynamic>> testUser = await db.query(
+      'users',
+      where: 'username = ?',
+      whereArgs: ['test'],
     );
+
+    if (testUser.isEmpty) {
+      print('创建测试用户...');
+      final hashedPassword = hashPassword('123456');
+      await db.insert('users', {
+        'id': '1',
+        'username': 'test',
+        'email': 'test@example.com',
+        'password': hashedPassword,
+        'type': 'UserType.PERSONAL',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+        'isactive': 1,
+      });
+      print('测试用户创建完成');
+
+      // 为测试用户创建默认的免费订阅
+      print('为测试用户创建默认免费订阅...');
+      final subscription = SubscriptionModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: '1',
+        type: SubscriptionType.FREE,
+        startDate: DateTime.now(),
+        endDate: DateTime.now().add(const Duration(days: 36500)), // 100年有效期
+        isActive: true,
+        maxRepositories: 3,
+        maxBoxesPerRepository: 10,
+        hasAdvancedProperties: false,
+        hasWatermarkProtection: false,
+        maxFamilyMembers: 1,
+        created_at: DateTime.now(),
+        updated_at: DateTime.now(),
+      );
+
+      await db.insert('subscriptions', subscription.toMap());
+      print('测试用户默认免费订阅创建完成');
+    }
   }
 
   Future<void> _createTables(Database db, int version) async {
+    print('开始创建数据库表...');
+    print('数据库版本: $version');
+
     // 用户表
-    await db.execute('''
-      CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        email TEXT NOT NULL UNIQUE,
-        phoneNumber TEXT,
-        avatarUrl TEXT,
-        nickName TEXT,
-        realName TEXT,
-        type TEXT NOT NULL,
-        points INTEGER NOT NULL DEFAULT 0,
-        coins INTEGER NOT NULL DEFAULT 0,
-        level INTEGER NOT NULL DEFAULT 1,
-        experience INTEGER NOT NULL DEFAULT 0,
-        isActive INTEGER NOT NULL DEFAULT 1
-      )
-    ''');
+    print('创建用户表...');
+    try {
+      await db.execute('''
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          username TEXT NOT NULL UNIQUE,
+          email TEXT NOT NULL UNIQUE,
+          password TEXT NOT NULL,
+          phoneNumber TEXT,
+          type TEXT NOT NULL,
+          level INTEGER NOT NULL DEFAULT 1,
+          experience INTEGER NOT NULL DEFAULT 0,
+          points INTEGER NOT NULL DEFAULT 0,
+          coins INTEGER NOT NULL DEFAULT 0,
+          avatar TEXT,
+          bio TEXT,
+          isactive INTEGER NOT NULL DEFAULT 1,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )
+      ''');
+      print('用户表创建完成');
+    } catch (e) {
+      print('创建用户表失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
+
+    // 仓库表
+    print('创建仓库表...');
+    try {
+      await db.execute('''
+        CREATE TABLE repositories (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          isPublic INTEGER NOT NULL DEFAULT 0,
+          isActive INTEGER NOT NULL DEFAULT 1,
+          boxIds TEXT,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      ''');
+      print('仓库表创建完成');
+    } catch (e) {
+      print('创建仓库表失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
     // 盒子表
-    await db.execute('''
-      CREATE TABLE boxes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT,
-        coverImage TEXT NOT NULL,
-        themeColor TEXT NOT NULL,
-        type TEXT NOT NULL,
-        isPublic INTEGER NOT NULL DEFAULT 0,
-        ownerId INTEGER NOT NULL,
-        parentBoxId INTEGER,
-        itemCount INTEGER NOT NULL DEFAULT 0,
-        hasExpiredItems INTEGER NOT NULL DEFAULT 0,
-        sortOrder INTEGER NOT NULL DEFAULT 0,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
-        FOREIGN KEY (ownerId) REFERENCES users (id),
-        FOREIGN KEY (parentBoxId) REFERENCES boxes (id)
-      )
-    ''');
+    print('创建盒子表...');
+    try {
+      await db.execute('''
+        CREATE TABLE boxes (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          image_path TEXT,
+          type TEXT NOT NULL,
+          isPublic INTEGER NOT NULL DEFAULT 0,
+          isPinned INTEGER NOT NULL DEFAULT 0,
+          repository_id TEXT,
+          creator_id TEXT,
+          item_count INTEGER NOT NULL DEFAULT 0,
+          has_expired_items INTEGER NOT NULL DEFAULT 0,
+          order_index INTEGER NOT NULL DEFAULT 0,
+          theme_color TEXT,
+          access_level TEXT,
+          password TEXT,
+          allowed_user_ids TEXT,
+          share_settings TEXT,
+          advanced_properties TEXT,
+          tags TEXT,
+          view_count INTEGER NOT NULL DEFAULT 0,
+          copy_count INTEGER NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      ''');
+      print('盒子表创建完成');
+    } catch (e) {
+      print('创建盒子表失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
     // 物品表
-    await db.execute('''
-      CREATE TABLE items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        boxId INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT,
-        imageUrls TEXT,
-        purchaseDate TEXT,
-        purchasePrice REAL,
-        currentPrice REAL,
-        brand TEXT,
-        model TEXT,
-        serialNumber TEXT,
-        qrCode TEXT,
-        nfcTag TEXT,
-        color TEXT,
-        size TEXT,
-        weight REAL,
-        conditionRating INTEGER,
-        isFavorite INTEGER NOT NULL DEFAULT 0,
-        sortOrder INTEGER NOT NULL DEFAULT 0,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
-        FOREIGN KEY (boxId) REFERENCES boxes (id)
-      )
-    ''');
-
-    // 关注表
-    await db.execute('''
-      CREATE TABLE follows (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        follower_id INTEGER NOT NULL,
-        following_id INTEGER NOT NULL,
-        FOREIGN KEY (follower_id) REFERENCES users (id),
-        FOREIGN KEY (following_id) REFERENCES users (id)
-      )
-    ''');
-
-    // 搜索历史表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS search_history (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        keyword TEXT NOT NULL,
-        search_time TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-      )
-    ''');
-
-    // 频道表
-    await db.execute('''
-      CREATE TABLE channels (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT,
-        coverImage TEXT NOT NULL,
-        themeColor TEXT NOT NULL,
-        ownerId INTEGER NOT NULL,
-        moderatorId INTEGER NOT NULL,
-        postCount INTEGER NOT NULL DEFAULT 0,
-        memberCount INTEGER NOT NULL DEFAULT 0,
-        isActive INTEGER NOT NULL DEFAULT 1,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
-        FOREIGN KEY (ownerId) REFERENCES users (id),
-        FOREIGN KEY (moderatorId) REFERENCES users (id)
-      )
-    ''');
+    print('创建物品表...');
+    try {
+      await db.execute('''
+        CREATE TABLE items (
+          id TEXT PRIMARY KEY,
+          box_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          image_path TEXT,
+          note TEXT,
+          type TEXT NOT NULL,
+          status TEXT NOT NULL,
+          priority TEXT,
+          due_date TEXT,
+          content TEXT,
+          tags TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          expiry_date TEXT,
+          pos_x REAL NOT NULL DEFAULT 0.0,
+          pos_y REAL NOT NULL DEFAULT 0.0,
+          scale REAL NOT NULL DEFAULT 1.0,
+          watermark_text TEXT,
+          isPublic INTEGER NOT NULL DEFAULT 0,
+          share_settings TEXT,
+          advanced_properties TEXT,
+          isfavorite INTEGER NOT NULL DEFAULT 0,
+          view_count INTEGER NOT NULL DEFAULT 0,
+          copy_count INTEGER NOT NULL DEFAULT 0,
+          image_urls TEXT,
+          brand TEXT,
+          model TEXT,
+          serial_number TEXT,
+          color TEXT,
+          size TEXT,
+          weight REAL,
+          purchase_price REAL,
+          current_price REAL,
+          purchase_date TEXT,
+          condition_rating INTEGER,
+          FOREIGN KEY (box_id) REFERENCES boxes (id) ON DELETE CASCADE
+        )
+      ''');
+      print('物品表创建完成');
+    } catch (e) {
+      print('创建物品表失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
     // 帖子表
-    await db.execute('''
-      CREATE TABLE posts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        channelId INTEGER NOT NULL,
-        authorId INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        imageUrls TEXT,
-        audioUrl TEXT,
-        videoUrl TEXT,
-        boxId INTEGER,
-        tags TEXT,
-        likeCount INTEGER NOT NULL DEFAULT 0,
-        commentCount INTEGER NOT NULL DEFAULT 0,
-        viewCount INTEGER NOT NULL DEFAULT 0,
-        isPinned INTEGER NOT NULL DEFAULT 0,
-        isTop INTEGER NOT NULL DEFAULT 0,
-        isActive INTEGER NOT NULL DEFAULT 1,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
-        FOREIGN KEY (channelId) REFERENCES channels (id),
-        FOREIGN KEY (authorId) REFERENCES users (id),
-        FOREIGN KEY (boxId) REFERENCES boxes (id)
-      )
-    ''');
+    print('创建帖子表...');
+    try {
+      await db.execute('''
+        CREATE TABLE posts (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          content TEXT NOT NULL,
+          type TEXT NOT NULL,
+          status TEXT NOT NULL,
+          view_count INTEGER NOT NULL DEFAULT 0,
+          like_count INTEGER NOT NULL DEFAULT 0,
+          comment_count INTEGER NOT NULL DEFAULT 0,
+          share_count INTEGER NOT NULL DEFAULT 0,
+          tags TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      ''');
+      print('帖子表创建完成');
+    } catch (e) {
+      print('创建帖子表失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
-    // 评论表
-    await db.execute('''
-      CREATE TABLE comments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        postId INTEGER NOT NULL,
-        authorId INTEGER NOT NULL,
-        content TEXT NOT NULL,
-        parentId INTEGER,
-        likeCount INTEGER NOT NULL DEFAULT 0,
-        isActive INTEGER NOT NULL DEFAULT 1,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
-        FOREIGN KEY (postId) REFERENCES posts (id),
-        FOREIGN KEY (authorId) REFERENCES users (id),
-        FOREIGN KEY (parentId) REFERENCES comments (id)
-      )
-    ''');
-
-    // 点赞表
-    await db.execute('''
-      CREATE TABLE likes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        userId INTEGER NOT NULL,
-        postId INTEGER,
-        commentId INTEGER,
-        createdAt TEXT NOT NULL,
-        FOREIGN KEY (userId) REFERENCES users (id),
-        FOREIGN KEY (postId) REFERENCES posts (id),
-        FOREIGN KEY (commentId) REFERENCES comments (id)
-      )
-    ''');
-
-    // 频道成员表
-    await db.execute('''
-      CREATE TABLE channel_members (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        channelId INTEGER NOT NULL,
-        userId INTEGER NOT NULL,
-        role TEXT NOT NULL,
-        joinedAt TEXT NOT NULL,
-        FOREIGN KEY (channelId) REFERENCES channels (id),
-        FOREIGN KEY (userId) REFERENCES users (id)
-      )
-    ''');
-
-    // 标签表
-    await db.execute('''
-      CREATE TABLE tags (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        postCount INTEGER NOT NULL DEFAULT 0,
-        createdAt TEXT NOT NULL
-      )
-    ''');
-
-    // 帖子标签关联表
-    await db.execute('''
-      CREATE TABLE post_tags (
-        postId INTEGER NOT NULL,
-        tagId INTEGER NOT NULL,
-        PRIMARY KEY (postId, tagId),
-        FOREIGN KEY (postId) REFERENCES posts (id),
-        FOREIGN KEY (tagId) REFERENCES tags (id)
-      )
-    ''');
-
-    // 签到表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS checkins (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        checkin_date TEXT NOT NULL,
-        consecutive_days INTEGER NOT NULL,
-        points_earned INTEGER NOT NULL,
-        coins_earned INTEGER NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-      )
-    ''');
+    // 频道表
+    print('创建频道表...');
+    try {
+      await db.execute('''
+        CREATE TABLE channels (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          owner_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          status TEXT NOT NULL,
+          member_count INTEGER NOT NULL DEFAULT 0,
+          post_count INTEGER NOT NULL DEFAULT 0,
+          is_private INTEGER NOT NULL DEFAULT 0,
+          password TEXT,
+          allowed_user_ids TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      ''');
+      print('频道表创建完成');
+    } catch (e) {
+      print('创建频道表失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
     // 等级表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS levels (
-        level INTEGER PRIMARY KEY,
-        required_exp INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        privileges TEXT NOT NULL
-      )
-    ''');
+    print('创建等级表...');
+    try {
+      await db.execute('''
+        CREATE TABLE levels (
+          level INTEGER PRIMARY KEY,
+          required_exp INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          privileges TEXT NOT NULL,
+          points_multiplier REAL NOT NULL DEFAULT 1.0,
+          coins_multiplier REAL NOT NULL DEFAULT 1.0
+        )
+      ''');
+      print('等级表创建完成');
+    } catch (e) {
+      print('创建等级表失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
-    // 用户等级表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS user_levels (
-        user_id TEXT PRIMARY KEY,
-        level INTEGER NOT NULL,
-        exp INTEGER NOT NULL,
-        total_exp INTEGER NOT NULL,
-        last_exp_update TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id),
-        FOREIGN KEY (level) REFERENCES levels (level)
-      )
-    ''');
+    // 订阅表
+    print('创建订阅表...');
+    try {
+      await db.execute('''
+        CREATE TABLE subscriptions (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          start_date TEXT NOT NULL,
+          end_date TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          payment_id TEXT,
+          payment_status TEXT,
+          payment_amount REAL,
+          payment_currency TEXT,
+          payment_date TEXT,
+          auto_renew INTEGER NOT NULL DEFAULT 0,
+          trial_period INTEGER NOT NULL DEFAULT 0,
+          max_repositories INTEGER NOT NULL DEFAULT 3,
+          max_boxes_per_repository INTEGER NOT NULL DEFAULT 10,
+          has_advanced_properties INTEGER NOT NULL DEFAULT 0,
+          has_watermark_protection INTEGER NOT NULL DEFAULT 0,
+          max_family_members INTEGER NOT NULL DEFAULT 1,
+          family_member_ids TEXT,
+          expiry_text TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      ''');
+      print('订阅表创建完成');
+    } catch (e) {
+      print('创建订阅表失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
-    // 商城商品表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS mall_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT NOT NULL,
-        image_url TEXT NOT NULL,
-        price REAL NOT NULL,
-        stock INTEGER NOT NULL,
-        type TEXT NOT NULL,
-        currency TEXT NOT NULL,
-        is_active INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    ''');
+    // 支付记录表
+    print('创建支付记录表...');
+    try {
+      await db.execute('''
+        CREATE TABLE payment_records (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          subscription_id TEXT NOT NULL,
+          amount REAL NOT NULL,
+          currency TEXT NOT NULL,
+          status TEXT NOT NULL,
+          payment_method TEXT NOT NULL,
+          transaction_id TEXT,
+          payment_date TEXT NOT NULL,
+          description TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+          FOREIGN KEY (subscription_id) REFERENCES subscriptions (id) ON DELETE CASCADE
+        )
+      ''');
+      print('支付记录表创建完成');
+    } catch (e) {
+      print('创建支付记录表失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
-    // 订单表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS orders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        item_id INTEGER NOT NULL,
-        order_number TEXT NOT NULL,
-        amount REAL NOT NULL,
-        currency TEXT NOT NULL,
-        status TEXT NOT NULL,
-        shipping_address TEXT,
-        tracking_number TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id),
-        FOREIGN KEY (item_id) REFERENCES mall_items (id)
-      )
-    ''');
+    // 检查用户表是否创建成功
+    try {
+      final userTable = await db.query('sqlite_master',
+          where: 'type = ? AND name = ?', whereArgs: ['table', 'users']);
+      if (userTable.isEmpty) {
+        throw Exception('用户表创建失败');
+      }
+      print('用户表创建验证成功');
+    } catch (e) {
+      print('验证用户表创建失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
-    // 版主表
-    await db.execute('''
-      CREATE TABLE moderators (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        channel_id INTEGER NOT NULL,
-        role TEXT NOT NULL,
-        permissions TEXT NOT NULL,
-        is_active INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id),
-        FOREIGN KEY (channel_id) REFERENCES channels (id)
-      )
-    ''');
+    // 创建测试用户
+    print('创建测试用户...');
+    try {
+      final hashedPassword = hashPassword('123456');
+      final testUser = {
+        'id': '1',
+        'username': 'test',
+        'email': 'test@example.com',
+        'password': hashedPassword,
+        'type': 'UserType.PERSONAL',
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+        'isActive': 1,
+      };
+      print('测试用户数据: $testUser');
 
-    // 版主申请表
-    await db.execute('''
-      CREATE TABLE moderator_applications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        channel_id INTEGER NOT NULL,
-        reason TEXT NOT NULL,
-        status TEXT NOT NULL,
-        reject_reason TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id),
-        FOREIGN KEY (channel_id) REFERENCES channels (id)
-      )
-    ''');
+      await db.insert('users', testUser);
+      print('测试用户创建完成');
 
-    // 版主操作日志表
-    await db.execute('''
-      CREATE TABLE moderator_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        moderator_id INTEGER NOT NULL,
-        channel_id INTEGER NOT NULL,
-        action TEXT NOT NULL,
-        target_type TEXT NOT NULL,
-        target_id INTEGER NOT NULL,
-        reason TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (moderator_id) REFERENCES moderators (id),
-        FOREIGN KEY (channel_id) REFERENCES channels (id)
-      )
-    ''');
+      // 验证测试用户是否创建成功
+      final testUserCheck =
+          await db.query('users', where: 'username = ?', whereArgs: ['test']);
+      if (testUserCheck.isEmpty) {
+        throw Exception('测试用户创建失败');
+      }
+      print('测试用户创建验证成功');
+    } catch (e) {
+      print('创建测试用户失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
-    // 创建频道申请表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS channel_applications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT NOT NULL,
-        category TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        reject_reason TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-      )
-    ''');
+    // 初始化等级系统
+    print('初始化等级系统...');
+    try {
+      await _initLevels(db);
+      print('等级系统初始化完成');
+    } catch (e) {
+      print('初始化等级系统失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
 
-    // 创建频道申请审核记录表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS channel_application_reviews (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        application_id INTEGER NOT NULL,
-        reviewer_id INTEGER NOT NULL,
-        action TEXT NOT NULL,
-        reason TEXT,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (application_id) REFERENCES channel_applications (id),
-        FOREIGN KEY (reviewer_id) REFERENCES users (id)
-      )
-    ''');
-
-    // 内容举报表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS content_reports (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        reporter_id INTEGER NOT NULL,
-        target_type TEXT NOT NULL,
-        target_id INTEGER NOT NULL,
-        reason TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        review_result TEXT,
-        review_note TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY (reporter_id) REFERENCES users (id)
-      )
-    ''');
-
-    // 内容审核记录表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS content_reviews (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        report_id INTEGER NOT NULL,
-        reviewer_id INTEGER NOT NULL,
-        action TEXT NOT NULL,
-        note TEXT,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (report_id) REFERENCES content_reports (id),
-        FOREIGN KEY (reviewer_id) REFERENCES users (id)
-      )
-    ''');
-
-    // 通知表
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS notifications (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        type TEXT NOT NULL,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        target_type TEXT,
-        target_id TEXT,
-        is_read INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-      )
-    ''');
-
-    // 订阅相关操作
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS subscriptions (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        type TEXT NOT NULL,
-        start_date TEXT NOT NULL,
-        end_date TEXT NOT NULL,
-        is_active INTEGER NOT NULL,
-        metadata TEXT,
-        family_member_ids TEXT,
-        max_repositories INTEGER NOT NULL,
-        max_boxes_per_repository INTEGER NOT NULL,
-        has_advanced_properties INTEGER NOT NULL,
-        has_watermark_protection INTEGER NOT NULL,
-        max_family_members INTEGER NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-      )
-    ''');
-
-    // 初始化等级数据
-    await _initLevels(db);
-
-    // 初始化商城商品
-    await _initMallItems(db);
+    print('所有数据库表创建完成');
   }
 
   Future<void> _initLevels(Database db) async {
@@ -484,6 +672,8 @@ class DatabaseService {
         title: '新手',
         description: '欢迎加入社区！',
         privileges: ['基础发帖', '基础评论'],
+        pointsMultiplier: 1.0,
+        coinsMultiplier: 1.0,
       ),
       LevelModel(
         level: 2,
@@ -491,6 +681,8 @@ class DatabaseService {
         title: '活跃用户',
         description: '开始活跃起来了！',
         privileges: ['创建投票', '上传图片'],
+        pointsMultiplier: 1.2,
+        coinsMultiplier: 1.2,
       ),
       LevelModel(
         level: 3,
@@ -498,6 +690,8 @@ class DatabaseService {
         title: '资深用户',
         description: '社区的中坚力量！',
         privileges: ['创建频道', '发起活动'],
+        pointsMultiplier: 1.5,
+        coinsMultiplier: 1.5,
       ),
       LevelModel(
         level: 4,
@@ -505,6 +699,8 @@ class DatabaseService {
         title: '社区精英',
         description: '社区的重要贡献者！',
         privileges: ['置顶帖子', '管理评论'],
+        pointsMultiplier: 2.0,
+        coinsMultiplier: 2.0,
       ),
       LevelModel(
         level: 5,
@@ -512,6 +708,8 @@ class DatabaseService {
         title: '社区领袖',
         description: '社区的核心力量！',
         privileges: ['管理频道', '审核内容'],
+        pointsMultiplier: 3.0,
+        coinsMultiplier: 3.0,
       ),
     ];
 
@@ -586,50 +784,171 @@ class DatabaseService {
 
   // 用户相关操作
   Future<int> insertUser(UserModel user) async {
-    final db = await database;
-    return await db.insert('users', user.toMap());
+    try {
+      print('开始插入用户到数据库: ${user.username}');
+      final db = await database;
+
+      // 检查必填字段
+      if (user.username.isEmpty) {
+        throw Exception('用户名不能为空');
+      }
+      if (user.email?.isEmpty ?? true) {
+        throw Exception('邮箱不能为空');
+      }
+      if (user.password.isEmpty) {
+        throw Exception('密码不能为空');
+      }
+
+      // 检查数据库连接
+
+      // 准备数据
+      final values = {
+        'username': user.username,
+        'email': user.email,
+        'password': user.password,
+        'type': user.type.toString(),
+        'avatar_url': user.avatarUrl,
+        'createdAt': user.createdAt.toIso8601String(),
+        'updatedAt': user.updatedAt.toIso8601String(),
+        'phone_number': user.phoneNumber,
+        'nick_name': user.nickName,
+        'real_name': user.realName,
+        'points': user.points,
+        'coins': user.coins,
+        'level': user.level,
+        'experience': user.experience,
+        'isActive': user.isActive ? 1 : 0,
+      };
+      print('准备插入的用户数据: $values');
+
+      // 检查表是否存在
+      final tables = await db.query('sqlite_master',
+          where: 'type = ? AND name = ?', whereArgs: ['table', 'users']);
+      if (tables.isEmpty) {
+        throw Exception('users表不存在，请检查数据库初始化');
+      }
+
+      final id = await db.insert('users', values);
+      print('用户插入成功，ID: $id');
+      return id;
+    } catch (e) {
+      print('插入用户失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
   }
 
-  Future<UserModel?> getUser(int id) async {
+  Future<UserModel?> getUser(String id) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'users',
       where: 'id = ?',
       whereArgs: [id],
     );
-    if (maps.isEmpty) return null;
+
+    if (maps.isEmpty) {
+      return null;
+    }
+
     return UserModel.fromMap(maps.first);
   }
 
+  Future<UserModel?> getUserById(String id) async {
+    return getUser(id);
+  }
+
   Future<UserModel?> getUserByUsername(String username) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'users',
-      where: 'username = ?',
-      whereArgs: [username],
-    );
-    if (maps.isEmpty) return null;
-    return UserModel.fromMap(maps.first);
+    try {
+      print('开始查询用户: $username');
+      final db = await database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'users',
+        where: 'username = ?',
+        whereArgs: [username],
+      );
+      print('查询结果: ${maps.length} 条记录');
+
+      if (maps.isEmpty) {
+        print('未找到用户: $username');
+        return null;
+      }
+
+      print('找到用户: ${maps.first}');
+      return UserModel.fromMap(maps.first);
+    } catch (e) {
+      print('查询用户失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
   }
 
   // 盒子相关操作
   Future<int> insertBox(BoxModel box) async {
-    final db = await database;
-    return await db.insert('boxes', box.toMap());
+    try {
+      print('开始插入盒子到数据库: ${box.name}');
+      final db = await database;
+
+      // 检查必填字段
+      if (box.name.isEmpty) {
+        throw Exception('盒子名称不能为空');
+      }
+
+      // 检查数据库连接
+
+      // 准备数据
+      final values = {
+        'user_id': box.userId,
+        'name': box.name,
+        'description': box.description,
+        'type': box.type.toString(),
+        'isPublic': box.isPublic ? 1 : 0,
+        'repository_id': box.repositoryId,
+        'creator_id': box.creatorId,
+        'item_count': box.itemCount,
+        'has_expired_items': box.hasExpiredItems ? 1 : 0,
+        'order_index': box.orderIndex,
+        'createdAt': box.createdAt.toIso8601String(),
+        'updatedAt': box.updatedAt.toIso8601String(),
+        'theme_color': box.themeColor,
+        'access_level': box.accessLevel.toString(),
+        'password': box.password,
+        'allowed_user_ids': box.allowedUserIds.join(','),
+        'share_settings':
+            box.shareSettings != null ? box.shareSettings.toString() : null,
+        'isPinned': box.isPinned ? 1 : 0,
+        'tags': box.tags.join(','),
+      };
+
+      print('准备插入的数据: $values');
+
+      // 检查表是否存在
+      final tables = await db.query('sqlite_master',
+          where: 'type = ? AND name = ?', whereArgs: ['table', 'boxes']);
+      if (tables.isEmpty) {
+        throw Exception('boxes表不存在，请检查数据库初始化');
+      }
+
+      final id = await db.insert('boxes', values);
+      print('盒子插入成功，ID: $id');
+      return id;
+    } catch (e) {
+      print('插入盒子失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
   }
 
-  Future<List<BoxModel>> getBoxesByOwner(int ownerId) async {
+  Future<List<BoxModel>> getBoxesByOwner(String ownerId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'boxes',
-      where: 'ownerId = ?',
+      where: 'user_id = ?',
       whereArgs: [ownerId],
-      orderBy: 'sortOrder ASC',
     );
     return List.generate(maps.length, (i) => BoxModel.fromMap(maps[i]));
   }
 
-  Future<BoxModel?> getBox(int id) async {
+  Future<BoxModel?> getBox(String id) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'boxes',
@@ -655,15 +974,11 @@ class DatabaseService {
     return await db.insert('items', item.toMap());
   }
 
-  Future<List<ItemModel>> getItemsByBox(int boxId) async {
+  Future<List<ItemModel>> getItemsByBox(String boxId) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'items',
-      where: 'boxId = ?',
-      whereArgs: [boxId],
-      orderBy: 'sortOrder ASC',
-    );
-    return List.generate(maps.length, (i) => ItemModel.fromMap(maps[i]));
+    final result =
+        await db.query('items', where: 'boxId = ?', whereArgs: [boxId]);
+    return result.map((e) => ItemModel.fromMap(e)).toList();
   }
 
   Future<ItemModel?> getItem(int id) async {
@@ -718,7 +1033,7 @@ class DatabaseService {
     );
   }
 
-  Future<int> deleteBox(int id) async {
+  Future<int> deleteBox(String id) async {
     final db = await database;
     return await db.delete(
       'boxes',
@@ -755,7 +1070,7 @@ class DatabaseService {
     );
   }
 
-  Future<List<FollowModel>> getFollowers(int userId) async {
+  Future<List<FollowModel>> getFollowers(String userId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'follows',
@@ -765,7 +1080,7 @@ class DatabaseService {
     return List.generate(maps.length, (i) => FollowModel.fromMap(maps[i]));
   }
 
-  Future<List<FollowModel>> getFollowing(int userId) async {
+  Future<List<FollowModel>> getFollowing(String userId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'follows',
@@ -775,7 +1090,7 @@ class DatabaseService {
     return List.generate(maps.length, (i) => FollowModel.fromMap(maps[i]));
   }
 
-  Future<int> getFollowerCount(int userId) async {
+  Future<int> getFollowerCount(String userId) async {
     final db = await database;
     final result = await db.rawQuery(
       'SELECT COUNT(*) as count FROM follows WHERE following_id = ?',
@@ -784,7 +1099,7 @@ class DatabaseService {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  Future<int> getFollowingCount(int userId) async {
+  Future<int> getFollowingCount(String userId) async {
     final db = await database;
     final result = await db.rawQuery(
       'SELECT COUNT(*) as count FROM follows WHERE follower_id = ?',
@@ -793,7 +1108,7 @@ class DatabaseService {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  Future<bool> isFollowing(int followerId, int followingId) async {
+  Future<bool> isFollowing(String followerId, String followingId) async {
     final db = await database;
     final result = await db.query(
       'follows',
@@ -854,7 +1169,7 @@ class DatabaseService {
   Future<int> insertPost(PostModel post) async {
     final db = await database;
     final postId = await db.insert('posts', post.toMap());
-    
+
     // 更新频道帖子数
     await db.rawUpdate(
       'UPDATE channels SET postCount = postCount + 1 WHERE id = ?',
@@ -928,7 +1243,7 @@ class DatabaseService {
   Future<int> insertComment(CommentModel comment) async {
     final db = await database;
     final commentId = await db.insert('comments', comment.toMap());
-    
+
     // 更新帖子评论数
     await db.rawUpdate(
       'UPDATE posts SET commentCount = commentCount + 1 WHERE id = ?',
@@ -964,6 +1279,17 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<CommentModel?> getComment(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'comments',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return CommentModel.fromMap(maps.first);
   }
 
   // 点赞相关方法
@@ -1048,7 +1374,7 @@ class DatabaseService {
   }
 
   // 频道成员相关方法
-  Future<void> joinChannel(int channelId, int userId) async {
+  Future<void> joinChannel(String channelId, String userId) async {
     final db = await database;
     await db.insert('channel_members', {
       'channelId': channelId,
@@ -1062,7 +1388,7 @@ class DatabaseService {
     );
   }
 
-  Future<void> leaveChannel(int channelId, int userId) async {
+  Future<void> leaveChannel(String channelId, String userId) async {
     final db = await database;
     await db.delete(
       'channel_members',
@@ -1075,7 +1401,7 @@ class DatabaseService {
     );
   }
 
-  Future<bool> isChannelMember(int channelId, int userId) async {
+  Future<bool> isChannelMember(String channelId, String userId) async {
     final db = await database;
     final result = await db.query(
       'channel_members',
@@ -1085,7 +1411,7 @@ class DatabaseService {
     return result.isNotEmpty;
   }
 
-  Future<String> getChannelMemberRole(int channelId, int userId) async {
+  Future<String> getChannelMemberRole(String channelId, String userId) async {
     final db = await database;
     final result = await db.query(
       'channel_members',
@@ -1098,7 +1424,8 @@ class DatabaseService {
 
   // 签到相关方法
   Future<List<CheckinModel>> getCheckinHistory(String userId) async {
-    final List<Map<String, dynamic>> maps = await database.query(
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
       'checkins',
       where: 'user_id = ?',
       whereArgs: [userId],
@@ -1176,7 +1503,7 @@ class DatabaseService {
     return LevelModel.fromMap(maps.first);
   }
 
-  Future<void> addExperience(int userId, int experience) async {
+  Future<void> addExperience(String userId, int experience) async {
     final db = await database;
     final user = await getUser(userId);
     if (user == null) return;
@@ -1222,7 +1549,7 @@ class DatabaseService {
     }
 
     if (onlyActive) {
-      whereClause.add('is_active = 1');
+      whereClause.add('isactive = 1');
     }
 
     final where = whereClause.isEmpty ? null : whereClause.join(' AND ');
@@ -1253,7 +1580,7 @@ class DatabaseService {
     return await db.insert('orders', order.toMap());
   }
 
-  Future<List<OrderModel>> getUserOrders(int userId) async {
+  Future<List<OrderModel>> getUserOrders(String userId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'orders',
@@ -1306,33 +1633,35 @@ class DatabaseService {
   }
 
   // 版主相关方法
-  Future<List<ModeratorModel>> getChannelModerators(int channelId) async {
+  Future<List<mod.ModeratorModel>> getChannelModerators(int channelId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'moderators',
-      where: 'channel_id = ? AND is_active = 1',
+      where: 'channel_id = ? AND isactive = 1',
       whereArgs: [channelId],
     );
-    return List.generate(maps.length, (i) => ModeratorModel.fromMap(maps[i]));
+    return List.generate(
+        maps.length, (i) => mod.ModeratorModel.fromMap(maps[i]));
   }
 
-  Future<ModeratorModel?> getModerator(int userId, int channelId) async {
+  Future<mod.ModeratorModel?> getModerator(
+      String userId, String channelId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'moderators',
-      where: 'user_id = ? AND channel_id = ? AND is_active = 1',
+      where: 'user_id = ? AND channel_id = ? AND isactive = 1',
       whereArgs: [userId, channelId],
     );
     if (maps.isEmpty) return null;
-    return ModeratorModel.fromMap(maps.first);
+    return mod.ModeratorModel.fromMap(maps.first);
   }
 
-  Future<int> createModerator(ModeratorModel moderator) async {
+  Future<int> createModerator(mod.ModeratorModel moderator) async {
     final db = await database;
     return await db.insert('moderators', moderator.toMap());
   }
 
-  Future<int> updateModerator(ModeratorModel moderator) async {
+  Future<int> updateModerator(mod.ModeratorModel moderator) async {
     final db = await database;
     return await db.update(
       'moderators',
@@ -1346,83 +1675,61 @@ class DatabaseService {
     final db = await database;
     return await db.update(
       'moderators',
-      {'is_active': 0, 'updated_at': DateTime.now().toIso8601String()},
+      {'isactive': 0, 'updated_at': DateTime.now().toIso8601String()},
       where: 'id = ?',
       whereArgs: [moderatorId],
     );
   }
 
   // 版主申请相关方法
-  Future<List<ModeratorApplicationModel>> getChannelApplications(int channelId) async {
+  Future<List<app.ModeratorApplicationModel>> getModeratorApplications() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'moderator_applications',
-      where: 'channel_id = ?',
-      whereArgs: [channelId],
       orderBy: 'created_at DESC',
     );
-    return List.generate(maps.length, (i) => ModeratorApplicationModel.fromMap(maps[i]));
+    return List.generate(
+        maps.length, (i) => app.ModeratorApplicationModel.fromMap(maps[i]));
   }
 
-  Future<ModeratorApplicationModel?> getUserApplication(int userId, int channelId) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'moderator_applications',
-      where: 'user_id = ? AND channel_id = ?',
-      whereArgs: [userId, channelId],
-    );
-    if (maps.isEmpty) return null;
-    return ModeratorApplicationModel.fromMap(maps.first);
-  }
-
-  Future<int> createApplication(ModeratorApplicationModel application) async {
+  Future<int> createModeratorApplication(
+      app.ModeratorApplicationModel application) async {
     final db = await database;
     return await db.insert('moderator_applications', application.toMap());
   }
 
-  Future<int> updateApplication(ModeratorApplicationModel application) async {
+  Future<void> updateModeratorApplicationStatus(int id, String status) async {
     final db = await database;
-    return await db.update(
+    await db.update(
       'moderator_applications',
-      application.toMap(),
+      {
+        'status': status,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
       where: 'id = ?',
-      whereArgs: [application.id],
+      whereArgs: [id],
     );
   }
 
-  // 版主操作日志相关方法
-  Future<List<ModeratorLogModel>> getModeratorLogs(int channelId, {int? moderatorId}) async {
+  // 版主日志相关方法
+  Future<List<log.ModeratorLogModel>> getModeratorLogs() async {
     final db = await database;
-    String whereClause = 'channel_id = ?';
-    List<dynamic> whereArgs = [channelId];
-    
-    if (moderatorId != null) {
-      whereClause += ' AND moderator_id = ?';
-      whereArgs.add(moderatorId);
-    }
-
     final List<Map<String, dynamic>> maps = await db.query(
       'moderator_logs',
-      where: whereClause,
-      whereArgs: whereArgs,
       orderBy: 'created_at DESC',
     );
-    return List.generate(maps.length, (i) => ModeratorLogModel.fromMap(maps[i]));
-  }
-
-  Future<int> createModeratorLog(ModeratorLogModel log) async {
-    final db = await database;
-    return await db.insert('moderator_logs', log.toMap());
+    return List.generate(
+        maps.length, (i) => log.ModeratorLogModel.fromMap(maps[i]));
   }
 
   // 获取频道申请列表
-  Future<List<ChannelApplicationModel>> getChannelApplications({
+  Future<List<channel_app.ChannelApplicationModel>> getChannelApplications({
     int? userId,
     String? status,
   }) async {
     final db = await database;
     String whereClause = '';
-    List<dynamic> whereArgs = [];
+    final List<dynamic> whereArgs = [];
 
     if (userId != null) {
       whereClause = 'WHERE user_id = ?';
@@ -1430,7 +1737,9 @@ class DatabaseService {
     }
 
     if (status != null) {
-      whereClause = whereClause.isEmpty ? 'WHERE status = ?' : '$whereClause AND status = ?';
+      whereClause = whereClause.isEmpty
+          ? 'WHERE status = ?'
+          : '$whereClause AND status = ?';
       whereArgs.add(status);
     }
 
@@ -1442,12 +1751,13 @@ class DatabaseService {
     );
 
     return List.generate(maps.length, (i) {
-      return ChannelApplicationModel.fromMap(maps[i]);
+      return channel_app.ChannelApplicationModel.fromMap(maps[i]);
     });
   }
 
   // 获取单个频道申请
-  Future<ChannelApplicationModel?> getChannelApplication(int id) async {
+  Future<channel_app.ChannelApplicationModel?> getChannelApplication(
+      int id) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'channel_applications',
@@ -1456,11 +1766,12 @@ class DatabaseService {
     );
 
     if (maps.isEmpty) return null;
-    return ChannelApplicationModel.fromMap(maps.first);
+    return channel_app.ChannelApplicationModel.fromMap(maps.first);
   }
 
   // 创建频道申请
-  Future<int> createChannelApplication(ChannelApplicationModel application) async {
+  Future<int> createChannelApplication(
+      channel_app.ChannelApplicationModel application) async {
     final db = await database;
     return await db.insert('channel_applications', application.toMap());
   }
@@ -1486,14 +1797,15 @@ class DatabaseService {
 
   // 创建频道申请审核记录
   Future<int> createChannelApplicationReview(
-    ChannelApplicationReviewModel review,
+    channel_review.ChannelApplicationReviewModel review,
   ) async {
     final db = await database;
     return await db.insert('channel_application_reviews', review.toMap());
   }
 
   // 获取频道申请审核记录
-  Future<List<ChannelApplicationReviewModel>> getChannelApplicationReviews(
+  Future<List<channel_review.ChannelApplicationReviewModel>>
+      getChannelApplicationReviews(
     int applicationId,
   ) async {
     final db = await database;
@@ -1505,19 +1817,19 @@ class DatabaseService {
     );
 
     return List.generate(maps.length, (i) {
-      return ChannelApplicationReviewModel.fromMap(maps[i]);
+      return channel_review.ChannelApplicationReviewModel.fromMap(maps[i]);
     });
   }
 
   // 内容审核相关方法
-  Future<List<ContentReportModel>> getContentReports({
+  Future<List<report.ContentReportModel>> getContentReports({
     String? status,
     String? targetType,
     int? targetId,
   }) async {
     final db = await database;
     String whereClause = '';
-    List<dynamic> whereArgs = [];
+    final List<dynamic> whereArgs = [];
 
     if (status != null) {
       whereClause = 'WHERE status = ?';
@@ -1525,12 +1837,16 @@ class DatabaseService {
     }
 
     if (targetType != null) {
-      whereClause = whereClause.isEmpty ? 'WHERE target_type = ?' : '$whereClause AND target_type = ?';
+      whereClause = whereClause.isEmpty
+          ? 'WHERE target_type = ?'
+          : '$whereClause AND target_type = ?';
       whereArgs.add(targetType);
     }
 
     if (targetId != null) {
-      whereClause = whereClause.isEmpty ? 'WHERE target_id = ?' : '$whereClause AND target_id = ?';
+      whereClause = whereClause.isEmpty
+          ? 'WHERE target_id = ?'
+          : '$whereClause AND target_id = ?';
       whereArgs.add(targetId);
     }
 
@@ -1541,10 +1857,11 @@ class DatabaseService {
       orderBy: 'created_at DESC',
     );
 
-    return List.generate(maps.length, (i) => ContentReportModel.fromMap(maps[i]));
+    return List.generate(
+        maps.length, (i) => report.ContentReportModel.fromMap(maps[i]));
   }
 
-  Future<ContentReportModel?> getContentReport(int id) async {
+  Future<report.ContentReportModel?> getContentReport(int id) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'content_reports',
@@ -1553,10 +1870,10 @@ class DatabaseService {
     );
 
     if (maps.isEmpty) return null;
-    return ContentReportModel.fromMap(maps.first);
+    return report.ContentReportModel.fromMap(maps.first);
   }
 
-  Future<int> createContentReport(ContentReportModel report) async {
+  Future<int> createContentReport(report.ContentReportModel report) async {
     final db = await database;
     return await db.insert('content_reports', report.toMap());
   }
@@ -1581,12 +1898,13 @@ class DatabaseService {
     );
   }
 
-  Future<int> createContentReview(ContentReviewModel review) async {
+  Future<int> createContentReview(review.ContentReviewModel review) async {
     final db = await database;
     return await db.insert('content_reviews', review.toMap());
   }
 
-  Future<List<ContentReviewModel>> getContentReviews(int reportId) async {
+  Future<List<review.ContentReviewModel>> getContentReviews(
+      int reportId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'content_reviews',
@@ -1595,12 +1913,14 @@ class DatabaseService {
       orderBy: 'created_at DESC',
     );
 
-    return List.generate(maps.length, (i) => ContentReviewModel.fromMap(maps[i]));
+    return List.generate(
+        maps.length, (i) => review.ContentReviewModel.fromMap(maps[i]));
   }
 
   // 获取所有等级
   Future<List<LevelModel>> getLevels() async {
-    final List<Map<String, dynamic>> maps = await database.query(
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
       'levels',
       orderBy: 'level ASC',
     );
@@ -1612,7 +1932,8 @@ class DatabaseService {
 
   // 获取用户等级信息
   Future<UserLevelModel?> getUserLevel(String userId) async {
-    final List<Map<String, dynamic>> maps = await database.query(
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
       'user_levels',
       where: 'user_id = ?',
       whereArgs: [userId],
@@ -1651,7 +1972,7 @@ class DatabaseService {
     final newExp = userLevel.exp + exp;
     final newTotalExp = userLevel.totalExp + exp;
     final levels = await getLevels();
-    
+
     // 计算新等级
     int newLevel = userLevel.level;
     for (var level in levels) {
@@ -1672,71 +1993,10 @@ class DatabaseService {
     await updateUserLevel(updatedUserLevel);
   }
 
-  // 初始化等级数据
-  Future<void> initializeLevels() async {
-    final levels = [
-      LevelModel(
-        level: 1,
-        requiredExp: 0,
-        title: '新手',
-        description: '欢迎加入社区！',
-        privileges: ['基础发帖', '基础评论'],
-      ),
-      LevelModel(
-        level: 2,
-        requiredExp: 100,
-        title: '活跃用户',
-        description: '开始活跃起来了！',
-        privileges: ['创建投票', '上传图片'],
-      ),
-      LevelModel(
-        level: 3,
-        requiredExp: 500,
-        title: '资深用户',
-        description: '社区的中坚力量！',
-        privileges: ['创建频道', '发起活动'],
-      ),
-      LevelModel(
-        level: 4,
-        requiredExp: 2000,
-        title: '社区精英',
-        description: '社区的重要贡献者！',
-        privileges: ['置顶帖子', '管理评论'],
-      ),
-      LevelModel(
-        level: 5,
-        requiredExp: 5000,
-        title: '社区领袖',
-        description: '社区的核心力量！',
-        privileges: ['管理频道', '审核内容'],
-      ),
-    ];
-
-    for (var level in levels) {
-      await database.insert(
-        'levels',
-        level.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
-  }
-
-  // 创建搜索历史表
-  Future<void> _createSearchTables() async {
-    await _database!.execute('''
-      CREATE TABLE IF NOT EXISTS search_history (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        keyword TEXT NOT NULL,
-        search_time TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-      )
-    ''');
-  }
-
   // 获取用户搜索历史
   Future<List<SearchHistoryModel>> getSearchHistory(String userId) async {
-    final List<Map<String, dynamic>> maps = await _database!.query(
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
       'search_history',
       where: 'user_id = ?',
       whereArgs: [userId],
@@ -1751,7 +2011,8 @@ class DatabaseService {
 
   // 添加搜索历史
   Future<void> addSearchHistory(SearchHistoryModel history) async {
-    await _database!.insert(
+    final db = await database;
+    await db.insert(
       'search_history',
       history.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -1760,7 +2021,8 @@ class DatabaseService {
 
   // 清除搜索历史
   Future<void> clearSearchHistory(String userId) async {
-    await _database!.delete(
+    final db = await database;
+    await db.delete(
       'search_history',
       where: 'user_id = ?',
       whereArgs: [userId],
@@ -1769,7 +2031,8 @@ class DatabaseService {
 
   // 搜索帖子
   Future<List<SearchResultModel>> searchPosts(String keyword) async {
-    final List<Map<String, dynamic>> maps = await _database!.rawQuery('''
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
       SELECT 
         p.id,
         p.title,
@@ -1789,12 +2052,12 @@ class DatabaseService {
     return List.generate(maps.length, (i) {
       final map = maps[i];
       return SearchResultModel(
-        id: map['id'] as String,
-        type: 'post',
+        id: map['id'].toString(),
+        type: SearchResultType.POST,
         title: map['title'] as String,
         description: map['description'] as String,
         imageUrl: map['image_url'] as String?,
-        extraData: {
+        metadata: {
           'author_name': map['author_name'] as String,
           'channel_name': map['channel_name'] as String,
         },
@@ -1805,7 +2068,8 @@ class DatabaseService {
 
   // 搜索频道
   Future<List<SearchResultModel>> searchChannels(String keyword) async {
-    final List<Map<String, dynamic>> maps = await _database!.rawQuery('''
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
       SELECT 
         c.id,
         c.name as title,
@@ -1826,12 +2090,12 @@ class DatabaseService {
     return List.generate(maps.length, (i) {
       final map = maps[i];
       return SearchResultModel(
-        id: map['id'] as String,
-        type: 'channel',
+        id: map['id'].toString(),
+        type: SearchResultType.CHANNEL,
         title: map['title'] as String,
         description: map['description'] as String,
         imageUrl: map['image_url'] as String?,
-        extraData: {
+        metadata: {
           'owner_name': map['owner_name'] as String,
           'post_count': map['post_count'] as int,
         },
@@ -1842,7 +2106,8 @@ class DatabaseService {
 
   // 搜索用户
   Future<List<SearchResultModel>> searchUsers(String keyword) async {
-    final List<Map<String, dynamic>> maps = await _database!.rawQuery('''
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
       SELECT 
         u.id,
         u.username as title,
@@ -1863,12 +2128,12 @@ class DatabaseService {
     return List.generate(maps.length, (i) {
       final map = maps[i];
       return SearchResultModel(
-        id: map['id'] as String,
-        type: 'user',
+        id: map['id'].toString(),
+        type: SearchResultType.USER,
         title: map['title'] as String,
         description: map['description'] as String,
         imageUrl: map['image_url'] as String?,
-        extraData: {
+        metadata: {
           'post_count': map['post_count'] as int,
           'channel_count': map['channel_count'] as int,
         },
@@ -1878,13 +2143,14 @@ class DatabaseService {
   }
 
   // 通知相关方法
-  Future<List<NotificationModel>> getNotifications(String userId, {bool onlyUnread = false}) async {
+  Future<List<NotificationModel>> getNotifications(String userId,
+      {bool onlyUnread = false}) async {
     final db = await database;
     String whereClause = 'user_id = ?';
-    List<dynamic> whereArgs = [userId];
+    final List<dynamic> whereArgs = [userId];
 
     if (onlyUnread) {
-      whereClause += ' AND is_read = 0';
+      whereClause += ' AND isread = 0';
     }
 
     final List<Map<String, dynamic>> maps = await db.query(
@@ -1894,13 +2160,14 @@ class DatabaseService {
       orderBy: 'created_at DESC',
     );
 
-    return List.generate(maps.length, (i) => NotificationModel.fromMap(maps[i]));
+    return List.generate(
+        maps.length, (i) => NotificationModel.fromMap(maps[i]));
   }
 
   Future<int> getUnreadNotificationCount(String userId) async {
     final db = await database;
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0',
+      'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND isread = 0',
       [userId],
     );
     return Sqflite.firstIntValue(result) ?? 0;
@@ -1919,7 +2186,7 @@ class DatabaseService {
     final db = await database;
     await db.update(
       'notifications',
-      {'is_read': 1},
+      {'isread': 1},
       where: 'id = ?',
       whereArgs: [notificationId],
     );
@@ -1929,7 +2196,7 @@ class DatabaseService {
     final db = await database;
     await db.update(
       'notifications',
-      {'is_read': 1},
+      {'isread': 1},
       where: 'user_id = ?',
       whereArgs: [userId],
     );
@@ -1963,38 +2230,70 @@ class DatabaseService {
         type TEXT NOT NULL,
         start_date TEXT NOT NULL,
         end_date TEXT NOT NULL,
-        is_active INTEGER NOT NULL,
-        metadata TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        payment_id TEXT,
+        payment_status TEXT,
+        payment_amount REAL,
+        payment_currency TEXT,
+        payment_date TEXT,
+        auto_renew INTEGER NOT NULL DEFAULT 0,
+        trial_period INTEGER NOT NULL DEFAULT 0,
+        max_repositories INTEGER NOT NULL DEFAULT 3,
+        max_boxes_per_repository INTEGER NOT NULL DEFAULT 10,
+        has_advanced_properties INTEGER NOT NULL DEFAULT 0,
+        has_watermark_protection INTEGER NOT NULL DEFAULT 0,
+        max_family_members INTEGER NOT NULL DEFAULT 1,
         family_member_ids TEXT,
-        max_repositories INTEGER NOT NULL,
-        max_boxes_per_repository INTEGER NOT NULL,
-        has_advanced_properties INTEGER NOT NULL,
-        has_watermark_protection INTEGER NOT NULL,
-        max_family_members INTEGER NOT NULL,
+        expiry_text TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
       )
     ''');
   }
 
   Future<SubscriptionModel?> getSubscription(String userId) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'subscriptions',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-    );
-
-    if (maps.isEmpty) {
-      // 如果没有找到订阅，创建一个免费订阅
-      final subscription = SubscriptionModel(
-        userId: userId,
-        type: SubscriptionType.FREE,
+    try {
+      print('开始获取用户 $userId 的订阅信息...');
+      final db = await database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'subscriptions',
+        where: 'user_id = ?',
+        whereArgs: [userId],
       );
-      await createSubscription(subscription);
-      return subscription;
-    }
 
-    return SubscriptionModel.fromMap(maps.first);
+      if (maps.isEmpty) {
+        print('未找到订阅信息，创建默认免费订阅');
+        // 创建默认的免费订阅
+        final subscription = SubscriptionModel(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: userId,
+          type: SubscriptionType.FREE,
+          startDate: DateTime.now(),
+          endDate: DateTime.now().add(const Duration(days: 36500)), // 100年有效期
+          isActive: true,
+          maxRepositories: 3,
+          maxBoxesPerRepository: 10,
+          hasAdvancedProperties: false,
+          hasWatermarkProtection: false,
+          maxFamilyMembers: 1,
+          created_at: DateTime.now(),
+          updated_at: DateTime.now(),
+        );
+
+        // 保存到数据库
+        await createSubscription(subscription);
+        print('默认免费订阅创建成功');
+        return subscription;
+      }
+
+      print('找到订阅信息: ${maps.first}');
+      return SubscriptionModel.fromMap(maps.first);
+    } catch (e) {
+      print('获取订阅信息失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
   }
 
   Future<void> createSubscription(SubscriptionModel subscription) async {
@@ -2025,7 +2324,8 @@ class DatabaseService {
     );
   }
 
-  Future<List<SubscriptionModel>> getSubscriptionsByType(SubscriptionType type) async {
+  Future<List<SubscriptionModel>> getSubscriptionsByType(
+      SubscriptionType type) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'subscriptions',
@@ -2033,7 +2333,8 @@ class DatabaseService {
       whereArgs: [type.toString()],
     );
 
-    return List.generate(maps.length, (i) => SubscriptionModel.fromMap(maps[i]));
+    return List.generate(
+        maps.length, (i) => SubscriptionModel.fromMap(maps[i]));
   }
 
   Future<List<SubscriptionModel>> getExpiredSubscriptions() async {
@@ -2041,11 +2342,12 @@ class DatabaseService {
     final now = DateTime.now().toIso8601String();
     final List<Map<String, dynamic>> maps = await db.query(
       'subscriptions',
-      where: 'end_date < ? AND is_active = 1',
+      where: 'end_date < ? AND isactive = 1',
       whereArgs: [now],
     );
 
-    return List.generate(maps.length, (i) => SubscriptionModel.fromMap(maps[i]));
+    return List.generate(
+        maps.length, (i) => SubscriptionModel.fromMap(maps[i]));
   }
 
   Future<void> deactivateExpiredSubscriptions() async {
@@ -2053,9 +2355,351 @@ class DatabaseService {
     final now = DateTime.now().toIso8601String();
     await db.update(
       'subscriptions',
-      {'is_active': 0},
-      where: 'end_date < ? AND is_active = 1',
+      {'isactive': 0},
+      where: 'end_date < ? AND isactive = 1',
       whereArgs: [now],
     );
   }
-} 
+
+  Future<List<PostModel>> getPosts() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'posts',
+      where: 'isActive = ?',
+      whereArgs: [1],
+      orderBy: 'createdAt DESC',
+    );
+    return List.generate(maps.length, (i) => PostModel.fromMap(maps[i]));
+  }
+
+  Future<void> updateComment(CommentModel comment) async {
+    final db = await database;
+    await db.update(
+      'comments',
+      comment.toMap(),
+      where: 'id = ?',
+      whereArgs: [comment.id],
+    );
+  }
+
+  Future<List<ItemModel>> getAllItems() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('items');
+    return List.generate(maps.length, (i) {
+      return ItemModel.fromMap(maps[i]);
+    });
+  }
+
+  Future<List<UserModel>> getModerators() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'type IN (?, ?)',
+      whereArgs: ['MODERATOR', 'ADMIN'],
+    );
+    return List.generate(maps.length, (i) => UserModel.fromMap(maps[i]));
+  }
+
+  // 获取频道的投票列表
+  Future<List<vote.VoteModel>> getChannelVotes(String channelId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'votes',
+      where: 'channel_id = ?',
+      whereArgs: [channelId],
+    );
+    return List.generate(maps.length, (i) => vote.VoteModel.fromMap(maps[i]));
+  }
+
+  // 获取投票详情
+  Future<vote.VoteModel?> getVote(String voteId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'votes',
+      where: 'id = ?',
+      whereArgs: [voteId],
+    );
+    if (maps.isEmpty) return null;
+    return vote.VoteModel.fromMap(maps.first);
+  }
+
+  // 获取投票选项
+  Future<List<option.VoteOptionModel>> getVoteOptions(String voteId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'vote_options',
+      where: 'vote_id = ?',
+      whereArgs: [voteId],
+    );
+    return List.generate(
+        maps.length, (i) => option.VoteOptionModel.fromMap(maps[i]));
+  }
+
+  // 获取用户的投票记录
+  Future<List<record.VoteRecordModel>> getUserVoteRecords(
+      String userId, String voteId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'vote_records',
+      where: 'user_id = ? AND vote_id = ?',
+      whereArgs: [userId, voteId],
+    );
+    return List.generate(
+        maps.length, (i) => record.VoteRecordModel.fromMap(maps[i]));
+  }
+
+  // 创建投票
+  Future<String> createVote(vote.VoteModel vote) async {
+    final db = await database;
+    final id = await db.insert('votes', vote.toMap());
+    return id.toString();
+  }
+
+  // 创建投票选项
+  Future<String> createVoteOption(option.VoteOptionModel option) async {
+    final db = await database;
+    final id = await db.insert('vote_options', option.toMap());
+    return id.toString();
+  }
+
+  // 创建投票记录
+  Future<String> createVoteRecord(record.VoteRecordModel record) async {
+    final db = await database;
+    final id = await db.insert('vote_records', record.toMap());
+    return id.toString();
+  }
+
+  // 更新投票选项计数
+  Future<void> updateVoteOptionCount(String optionId, int count) async {
+    final db = await database;
+    await db.update(
+      'vote_options',
+      {'count': count},
+      where: 'id = ?',
+      whereArgs: [optionId],
+    );
+  }
+
+  // 更新投票总票数
+  Future<void> updateVoteTotalVotes(String voteId, int totalVotes) async {
+    final db = await database;
+    await db.update(
+      'votes',
+      {'total_votes': totalVotes},
+      where: 'id = ?',
+      whereArgs: [voteId],
+    );
+  }
+
+  // 更新投票状态
+  Future<void> updateVoteStatus(String voteId, String status) async {
+    final db = await database;
+    await db.update(
+      'votes',
+      {'status': status},
+      where: 'id = ?',
+      whereArgs: [voteId],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _query(
+    String table, {
+    String? where,
+    List<dynamic>? whereArgs,
+    String? orderBy,
+    int? limit,
+  }) async {
+    final db = await database;
+    return await db.query(
+      table,
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: orderBy,
+      limit: limit,
+    );
+  }
+
+  // 修改使用 query 的地方
+  Future<List<Map<String, dynamic>>> getData(String table) async {
+    return await _query(table);
+  }
+
+  Future<List<SearchResultModel>> search(
+      String keyword, SearchResultType type) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'search_results',
+      where: 'keyword = ? AND type = ?',
+      whereArgs: [keyword, type.toString().split('.').last],
+    );
+    return List.generate(
+        maps.length, (i) => SearchResultModel.fromMap(maps[i]));
+  }
+
+  Future<void> deleteDatabase() async {
+    try {
+      print('开始删除数据库...');
+      final dbPath = await getDatabasesPath();
+      final path = join(dbPath, 'magic_box.db');
+      await databaseFactory.deleteDatabase(path);
+      print('数据库删除成功');
+    } catch (e) {
+      print('删除数据库失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
+  }
+
+  Future<List<RepositoryModel>> getRepositoriesByOwner(String ownerId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'repositories',
+      where: 'user_id = ?',
+      whereArgs: [ownerId],
+    );
+    return List.generate(maps.length, (i) => RepositoryModel.fromMap(maps[i]));
+  }
+
+  Future<int> insert(String table, Map<String, dynamic> data) async {
+    try {
+      final db = await database;
+      return await db.insert(table, data);
+    } catch (e) {
+      if (e.toString().contains('SQLITE_READONLY_DBMOVED')) {
+        print('检测到数据库只读错误，尝试重新初始化...');
+        await initializeDatabase();
+        final db = await database;
+        return await db.insert(table, data);
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> reinitializeDatabase() async {
+    try {
+      print('开始重新初始化数据库...');
+
+      // 关闭现有数据库连接
+      if (_database != null) {
+        print('关闭现有数据库连接...');
+        await _database!.close();
+        _database = null;
+        print('数据库连接已关闭');
+      }
+
+      // 删除现有数据库文件
+      final String path = join(await getDatabasesPath(), 'magicbox.db');
+      print('数据库文件路径: $path');
+      final dbFile = File(path);
+      if (await dbFile.exists()) {
+        print('删除现有数据库文件...');
+        await dbFile.delete();
+        print('数据库文件删除成功');
+      } else {
+        print('数据库文件不存在，无需删除');
+      }
+
+      // 重新初始化数据库
+      print('开始重新初始化数据库...');
+      _database = await _initDatabase();
+      print('数据库重新初始化完成');
+    } catch (e) {
+      print('重新初始化数据库失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> rawQuery(String sql,
+      [List<dynamic>? arguments]) async {
+    final db = await database;
+    return await db.rawQuery(sql, arguments);
+  }
+
+  Future<int> rawUpdate(String sql, [List<dynamic>? arguments]) async {
+    final db = await database;
+    return await db.rawUpdate(sql, arguments);
+  }
+
+  Future<int> rawInsert(String sql, [List<dynamic>? arguments]) async {
+    final db = await database;
+    return await db.rawInsert(sql, arguments);
+  }
+
+  Future<int> rawDelete(String sql, [List<dynamic>? arguments]) async {
+    final db = await database;
+    return await db.rawDelete(sql, arguments);
+  }
+
+  Future<bool> isDatabaseOpen() async {
+    try {
+      if (_database == null) return false;
+      // 尝试执行一个简单的查询来检查数据库连接
+      await _database!.rawQuery('SELECT 1');
+      return true;
+    } catch (e) {
+      print('检查数据库连接状态失败: $e');
+      return false;
+    }
+  }
+
+  Future<void> initializeDatabase() async {
+    print('开始重新初始化数据库...');
+    try {
+      if (_database != null) {
+        await _database!.close();
+        _database = null;
+      }
+      
+      // 获取数据库文件路径
+      final dbPath = await getDatabasesPath();
+      final path = join(dbPath, 'magicbox.db');
+      
+      // 检查数据库文件是否存在
+      final dbFile = File(path);
+      if (await dbFile.exists()) {
+        print('删除旧的数据库文件...');
+        await dbFile.delete();
+      }
+      
+      print('创建新的数据库连接...');
+      _database = await _initDatabase();
+      print('数据库重新初始化完成');
+    } catch (e) {
+      print('重新初始化数据库失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      rethrow;
+    }
+  }
+
+  Future<int> insertBox2(BoxModel box) async {
+    try {
+      print('开始插入盒子数据...');
+      final db = await database;
+      
+      // 检查数据库连接状态
+      if (!await isDatabaseOpen()) {
+        print('数据库未打开，尝试重新初始化');
+        await initializeDatabase();
+        return await insertBox(box); // 递归调用
+      }
+
+      print('插入盒子数据: ${box.toMap()}');
+      final id = await db.insert('boxes', box.toMap());
+      print('盒子数据插入成功，ID: $id');
+      return id;
+    } catch (e) {
+      print('插入盒子数据失败: $e');
+      print('错误堆栈: ${StackTrace.current}');
+      
+      // 如果是数据库只读错误，尝试重新初始化数据库
+      if (e.toString().contains('SQLITE_READONLY_DBMOVED')) {
+        print('检测到数据库只读错误，尝试重新初始化数据库');
+        await initializeDatabase();
+        return await insertBox(box); // 递归调用
+      }
+      
+      rethrow;
+    }
+  }
+}

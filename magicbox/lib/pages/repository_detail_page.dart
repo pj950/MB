@@ -1,27 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/box_controller.dart';
+import '../controllers/auth_controller.dart';
+import '../controllers/subscription_controller.dart';
 import '../models/box_model.dart';
 import '../models/repository_model.dart';
 import 'box_detail_page.dart';
 
 class RepositoryDetailPage extends StatefulWidget {
   final RepositoryModel repository;
-  
+
   const RepositoryDetailPage({super.key, required this.repository});
 
   @override
   State<RepositoryDetailPage> createState() => _RepositoryDetailPageState();
 }
 
-class _RepositoryDetailPageState extends State<RepositoryDetailPage> with SingleTickerProviderStateMixin {
+class _RepositoryDetailPageState extends State<RepositoryDetailPage>
+    with SingleTickerProviderStateMixin {
   final BoxController boxController = Get.find<BoxController>();
-  
+  final AuthController authController = Get.find<AuthController>();
+  final SubscriptionController subscriptionController = Get.find<SubscriptionController>();
+
   late AnimationController _pageController;
   late Animation<double> _pageAnimation;
   double _scale = 1.0;
   Offset _offset = Offset.zero;
-  
+
   @override
   void initState() {
     super.initState();
@@ -34,10 +39,10 @@ class _RepositoryDetailPageState extends State<RepositoryDetailPage> with Single
       curve: Curves.easeOutCubic,
     );
     _pageController.forward();
-    
-    boxController.loadBoxes(widget.repository.id!);
+
+    boxController.loadBoxes();
   }
-  
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -46,9 +51,10 @@ class _RepositoryDetailPageState extends State<RepositoryDetailPage> with Single
 
   @override
   Widget build(BuildContext context) {
+    final repository = widget.repository;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.repository.name),
+        title: Text(repository.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -60,202 +66,118 @@ class _RepositoryDetailPageState extends State<RepositoryDetailPage> with Single
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () => _showCreateBoxDialog(context),
+      body: Column(
+        children: [
+          _buildRepositoryInfo(),
+          Expanded(
+            child: _buildBoxList(),
+          ),
+        ],
       ),
-      body: GestureDetector(
-        onScaleUpdate: (details) {
-          setState(() {
-            _scale = details.scale.clamp(0.5, 2.0);
-            _offset += details.focalPointDelta;
-          });
-        },
-        child: AnimatedBuilder(
-          animation: _pageAnimation,
-          builder: (context, child) {
-            return Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.blue.withOpacity(0.2),
-                    Colors.white,
-                  ],
-                ),
-              ),
-              child: Transform(
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.001)
-                  ..scale(_scale)
-                  ..translate(_offset.dx, _offset.dy)
-                  ..rotateX(_pageAnimation.value * 0.1)
-                  ..rotateY(_pageAnimation.value * 0.1),
-                alignment: Alignment.center,
-                child: Obx(() {
-                  if (boxController.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final boxes = boxController.getBoxesByRepository(widget.repository.id!);
-                  if (boxes.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.inbox,
-                            size: 80,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            '还没有盒子',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '点击下方按钮创建盒子',
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: () => _showCreateBoxDialog(context),
-                            icon: const Icon(Icons.add),
-                            label: const Text('创建盒子'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 12,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 1.2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                    ),
-                    itemCount: boxes.length,
-                    itemBuilder: (context, index) {
-                      final box = boxes[index];
-                      return _BoxCard(
-                        box: box,
-                        onTap: () => Get.to(() => BoxDetailPage(box: box)),
-                      );
-                    },
-                  );
-                }),
-              ),
-            );
-          },
-        ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => boxController.showCreateBoxDialog(repository.id),
+        icon: const Icon(Icons.add),
+        label: const Text('创建盒子'),
+        elevation: 4,
       ),
     );
   }
 
-  void _showCreateBoxDialog(BuildContext context) {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-    BoxType selectedType = BoxType.NORMAL;
-    bool isPublic = false;
+  Widget _buildRepositoryInfo() {
+    // Implementation of _buildRepositoryInfo method
+    return Container(); // Placeholder return, actual implementation needed
+  }
 
-    Get.dialog(
-      AlertDialog(
-        title: const Text('创建盒子'),
-        content: StatefulBuilder(
-          builder: (context, setState) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: '盒子名称',
+  Widget _buildBoxList() {
+    return GestureDetector(
+      onScaleUpdate: (details) {
+        setState(() {
+          _scale = details.scale.clamp(0.5, 2.0);
+          _offset += details.focalPointDelta;
+        });
+      },
+      child: AnimatedBuilder(
+        animation: _pageAnimation,
+        builder: (context, child) {
+          return Obx(() {
+            if (boxController.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final boxes = boxController.boxes
+                .where((box) => box.repositoryId == widget.repository.id)
+                .toList();
+            if (boxes.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.inbox,
+                      size: 80,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '还没有盒子',
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '点击下方按钮创建盒子',
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => boxController.showCreateBoxDialog(widget.repository.id),
+                      icon: const Icon(Icons.add),
+                      label: const Text('创建盒子'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<BoxType>(
-                value: selectedType,
-                items: BoxType.values.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(type.toString().split('.').last),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => selectedType = value);
-                  }
-                },
-                decoration: const InputDecoration(
-                  labelText: '盒子类型',
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: '描述（选填）',
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('公开盒子'),
-                value: isPublic,
-                onChanged: (value) {
-                  setState(() => isPublic = value);
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nameController.text.isEmpty) {
-                Get.snackbar('错误', '请输入盒子名称');
-                return;
-              }
-              boxController.createBox(
-                name: nameController.text,
-                type: selectedType,
-                description: descriptionController.text.isEmpty
-                    ? null
-                    : descriptionController.text,
-                isPublic: isPublic,
-                repositoryId: widget.repository.id!,
               );
-              Get.back();
-            },
-            child: const Text('创建'),
-          ),
-        ],
+            }
+
+            return GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate:
+                  const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 1.2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: boxes.length,
+              itemBuilder: (context, index) {
+                final box = boxes[index];
+                return _BoxCard(
+                  box: box,
+                  onTap: () => Get.to(() => BoxDetailPage(box: box)),
+                );
+              },
+            );
+          });
+        },
       ),
     );
   }
 
   void _showEditDialog(BuildContext context) {
     final nameController = TextEditingController(text: widget.repository.name);
-    final descriptionController = TextEditingController(text: widget.repository.description);
+    final descriptionController =
+        TextEditingController(text: widget.repository.description ?? '');
     bool isPublic = widget.repository.isPublic;
 
     Get.dialog(
@@ -292,7 +214,7 @@ class _RepositoryDetailPageState extends State<RepositoryDetailPage> with Single
         ),
         actions: [
           TextButton(
-            onPressed: () => Get.back(),
+            onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
           ),
           ElevatedButton(
@@ -335,6 +257,15 @@ class _RepositoryDetailPageState extends State<RepositoryDetailPage> with Single
       ),
     );
   }
+
+  Future<BoxModel?> getBox(String id) async {
+    try {
+      return await boxController.getBox(id);
+    } catch (e) {
+      Get.snackbar('错误', '获取盒子失败：$e');
+      return null;
+    }
+  }
 }
 
 class _BoxCard extends StatefulWidget {
@@ -350,7 +281,8 @@ class _BoxCard extends StatefulWidget {
   State<_BoxCard> createState() => _BoxCardState();
 }
 
-class _BoxCardState extends State<_BoxCard> with SingleTickerProviderStateMixin {
+class _BoxCardState extends State<_BoxCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   bool _isHovered = false;
@@ -402,13 +334,13 @@ class _BoxCardState extends State<_BoxCard> with SingleTickerProviderStateMixin 
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(_isHovered ? 0.4 : 0.2),
+                      color: Colors.black.withAlpha(_isHovered ? 102 : 51),
                       blurRadius: _isHovered ? 15 : 10,
                       offset: Offset(0, _isHovered ? 8 : 4),
                     ),
                   ],
                   border: Border.all(
-                    color: Colors.white.withOpacity(_isHovered ? 0.8 : 0.5),
+                    color: Colors.white.withAlpha(_isHovered ? 204 : 128),
                     width: _isHovered ? 2 : 1,
                   ),
                 ),
@@ -424,7 +356,9 @@ class _BoxCardState extends State<_BoxCard> with SingleTickerProviderStateMixin 
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                Color(int.parse(widget.box.themeColor.replaceAll('#', '0xFF'))).withOpacity(0.2),
+                                Color(int.parse(widget.box.themeColor
+                                        .replaceAll('#', '0xFF')))
+                                    .withAlpha(51),
                                 Colors.white,
                               ],
                             ),
@@ -442,7 +376,8 @@ class _BoxCardState extends State<_BoxCard> with SingleTickerProviderStateMixin 
                             children: [
                               Icon(
                                 Icons.inbox,
-                                color: Color(int.parse(widget.box.themeColor.replaceAll('#', '0xFF'))),
+                                color: Color(int.parse(widget.box.themeColor
+                                    .replaceAll('#', '0xFF'))),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -506,4 +441,4 @@ class _BoxCardState extends State<_BoxCard> with SingleTickerProviderStateMixin 
       ),
     );
   }
-} 
+}

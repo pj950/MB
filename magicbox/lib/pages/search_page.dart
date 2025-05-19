@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../controllers/search_controller.dart';
+import '../controllers/search_controller.dart' as custom;
 import '../models/search_model.dart';
 
 class SearchPage extends StatelessWidget {
-  final SearchController _controller = Get.put(SearchController());
+  final custom.SearchController _controller =
+      Get.put(custom.SearchController());
   final TextEditingController _searchController = TextEditingController();
 
-  SearchPage({Key? key}) : super(key: key);
+  SearchPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +37,7 @@ class SearchPage extends StatelessWidget {
         ],
       ),
       body: Obx(() {
-        if (_controller.isLoading.value) {
+        if (_controller.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -273,4 +274,4 @@ class SearchPage extends StatelessWidget {
       return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     }
   }
-} 
+}

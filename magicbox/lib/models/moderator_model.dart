@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class ModeratorModel {
   final int? id;
   final int userId;
@@ -50,7 +48,7 @@ class ModeratorModel {
       'channel_id': channelId,
       'role': role,
       'permissions': permissions.join(','),
-      'is_active': isActive ? 1 : 0,
+      'isactive': isActive ? 1 : 0,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -63,7 +61,7 @@ class ModeratorModel {
       channelId: map['channel_id'] as int,
       role: map['role'] as String,
       permissions: (map['permissions'] as String).split(','),
-      isActive: map['is_active'] == 1,
+      isActive: map['isactive'] == 1,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -208,4 +206,4 @@ class ModeratorLogModel {
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
-} 
+}

@@ -49,4 +49,30 @@ class FollowModel {
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
   }
+
+  @override
+  String toString() {
+    return 'FollowModel(id: $id, followerId: $followerId, followingId: $followingId, createdAt: $createdAt, updatedAt: $updatedAt)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+  
+    return other is FollowModel &&
+      other.id == id &&
+      other.followerId == followerId &&
+      other.followingId == followingId &&
+      other.createdAt == createdAt &&
+      other.updatedAt == updatedAt;
+  }
+
+  @override
+  int get hashCode {
+    return id.hashCode ^
+      followerId.hashCode ^
+      followingId.hashCode ^
+      createdAt.hashCode ^
+      updatedAt.hashCode;
+  }
 } 

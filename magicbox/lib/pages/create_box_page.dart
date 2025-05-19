@@ -8,6 +8,7 @@ import '../controllers/box_controller.dart';
 import '../models/box_model.dart';
 import '../utils/image_picker_helper.dart';
 import '../utils/theme_helper.dart';
+import '../controllers/auth_controller.dart';
 
 class CreateBoxPage extends StatefulWidget {
   const CreateBoxPage({super.key});
@@ -24,6 +25,7 @@ class _CreateBoxPageState extends State<CreateBoxPage> {
   String selectedColor = 'orange'; // 默认主题色
 
   final BoxController boxController = Get.find();
+  final AuthController authController = Get.find();
 
   final colors = ['orange', 'purple', 'blue', 'green', 'pink'];
 
@@ -85,7 +87,7 @@ class _CreateBoxPageState extends State<CreateBoxPage> {
                       Container(
                         decoration: BoxDecoration(
                           color: ThemeHelper.getMaterialForTheme(selectedColor)
-                              .withOpacity(0.2),
+                              .withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
@@ -138,29 +140,35 @@ class _CreateBoxPageState extends State<CreateBoxPage> {
           coverImageBytes = null;
         }
       });
-      print('✅ 封面图片选择完成');
-    } else {
-      print('❌ 没有选择图片');
     }
   }
 
   void createBox() {
-    print('🚀 createBox triggered');
-    print('📸 coverImage: $coverImage');
-    print('📦 coverImageBytes: $coverImageBytes');
-    print('📝 name: ${nameController.text.trim()}');
+    final currentUserId = authController.currentUser?.id;
+    if (currentUserId == null) {
+      Get.snackbar('错误', '请先登录');
+      return;
+    }
 
     if ((coverImage != null || coverImageBytes != null) &&
         nameController.text.trim().isNotEmpty) {
-      boxController.addBox(BoxModel(
+      final box = BoxModel(
         name: nameController.text.trim(),
-        coverImage: kIsWeb ? 'web_memory_image' : coverImage!.path,
+        repositoryId: currentUserId.toString(),
+        type: BoxType.CUSTOM,
+        creatorId: currentUserId.toString(),
+        userId: currentUserId.toString(),
+        description: null,
+        isPublic: false,
         themeColor: selectedColor,
-      ));
-      print('✅ 已调用 boxController.addBox');
+        accessLevel: BoxAccessLevel.PRIVATE,
+        password: null,
+        allowedUserIds: [],
+      );
+      
+      boxController.createBox(box);
       Get.back();
     } else {
-      print('❌ 未通过验证，封面或名称为空');
       Get.snackbar('提示', '请完善信息');
     }
   }

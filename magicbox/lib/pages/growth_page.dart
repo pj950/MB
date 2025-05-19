@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/growth_controller.dart';
-import '../models/checkin_model.dart';
-import '../models/level_model.dart';
 
 class GrowthPage extends StatelessWidget {
   final GrowthController _controller = Get.put(GrowthController());
 
-  GrowthPage({Key? key}) : super(key: key);
+  GrowthPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -54,14 +52,14 @@ class GrowthPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _controller.currentLevel.value.name,
+                  _controller.currentLevel.title,
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  'Lv.${_controller.currentLevel.value.level}',
+                  'Lv.${_controller.currentLevel.level}',
                   style: const TextStyle(
                     fontSize: 20,
                     color: Colors.blue,
@@ -76,7 +74,7 @@ class GrowthPage extends StatelessWidget {
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
             ),
             const SizedBox(height: 8),
-            if (_controller.nextLevel.value != null)
+            if (_controller.nextLevel != null)
               Text(
                 '距离下一级还需${_controller.getExperienceToNextLevel()}经验',
                 style: const TextStyle(
@@ -107,7 +105,7 @@ class GrowthPage extends StatelessWidget {
   }
 
   Widget _buildCheckinCard() {
-    final lastCheckin = _controller.lastCheckin.value;
+    final lastCheckin = _controller.lastCheckin;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final canCheckin = lastCheckin == null ||
@@ -174,7 +172,7 @@ class GrowthPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            ..._controller.currentLevel.value.privileges.map((privilege) {
+            ..._controller.currentLevel.privileges.map((privilege) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -190,7 +188,7 @@ class GrowthPage extends StatelessWidget {
                 ),
               );
             }),
-            if (_controller.nextLevel.value != null) ...[
+            if (_controller.nextLevel != null) ...[
               const SizedBox(height: 16),
               const Text(
                 '下一级特权',
@@ -200,9 +198,9 @@ class GrowthPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              ..._controller.nextLevel.value!.privileges
+              ..._controller.nextLevel!.privileges
                   .where((privilege) =>
-                      !_controller.currentLevel.value.privileges.contains(privilege))
+                      !_controller.currentLevel.privileges.contains(privilege))
                   .map((privilege) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -255,4 +253,4 @@ class GrowthPage extends StatelessWidget {
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
-} 
+}

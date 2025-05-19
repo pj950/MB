@@ -6,7 +6,7 @@ import '../models/help_model.dart';
 class HelpPage extends StatelessWidget {
   final HelpController controller = Get.put(HelpController());
 
-  HelpPage({Key? key}) : super(key: key);
+  HelpPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +74,7 @@ class HelpPage extends StatelessWidget {
                     },
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         ),
@@ -128,7 +128,8 @@ class HelpPage extends StatelessWidget {
                   ),
                   Chip(
                     label: Text(article.category),
-                    backgroundColor: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
+                    backgroundColor:
+                        Theme.of(Get.context!).primaryColor.withOpacity(0.1),
                   ),
                 ],
               ),
@@ -236,7 +237,8 @@ class HelpPage extends StatelessWidget {
               const SizedBox(height: 8),
               Chip(
                 label: Text(article.category),
-                backgroundColor: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
+                backgroundColor:
+                    Theme.of(Get.context!).primaryColor.withOpacity(0.1),
               ),
               const SizedBox(height: 16),
               Text(article.content),
@@ -258,4 +260,4 @@ class HelpPage extends StatelessWidget {
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
-} 
+}

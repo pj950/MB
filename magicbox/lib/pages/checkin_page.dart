@@ -6,7 +6,7 @@ import '../models/checkin_model.dart';
 class CheckinPage extends StatelessWidget {
   final CheckinController _controller = Get.put(CheckinController());
 
-  CheckinPage({Key? key}) : super(key: key);
+  CheckinPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -290,4 +290,4 @@ class CheckinPage extends StatelessWidget {
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
-} 
+}

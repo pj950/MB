@@ -84,7 +84,7 @@ class HelpDocumentModel {
       'author': author,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
-      'is_published': isPublished,
+      'ispublished': isPublished,
       'view_count': viewCount,
       'rating': rating,
       'rating_count': ratingCount,
@@ -104,11 +104,13 @@ class HelpDocumentModel {
       author: map['author'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
-      isPublished: map['is_published'] as bool? ?? true,
+      isPublished: map['ispublished'] as bool? ?? true,
       viewCount: map['view_count'] as int? ?? 0,
       rating: map['rating'] as double?,
       ratingCount: map['rating_count'] as int? ?? 0,
-      relatedDocuments: (map['related_documents'] as List<dynamic>?)?.map((e) => e as String).toList(),
+      relatedDocuments: (map['related_documents'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
       metadata: map['metadata'] as Map<String, dynamic>?,
     );
   }
@@ -121,41 +123,41 @@ class HelpDocumentModel {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-  
+
     return other is HelpDocumentModel &&
-      other.id == id &&
-      other.title == title &&
-      other.content == content &&
-      other.category == category &&
-      other.order == order &&
-      other.tags == tags &&
-      other.author == author &&
-      other.createdAt == createdAt &&
-      other.updatedAt == updatedAt &&
-      other.isPublished == isPublished &&
-      other.viewCount == viewCount &&
-      other.rating == rating &&
-      other.ratingCount == ratingCount &&
-      other.relatedDocuments == relatedDocuments &&
-      other.metadata == metadata;
+        other.id == id &&
+        other.title == title &&
+        other.content == content &&
+        other.category == category &&
+        other.order == order &&
+        other.tags == tags &&
+        other.author == author &&
+        other.createdAt == createdAt &&
+        other.updatedAt == updatedAt &&
+        other.isPublished == isPublished &&
+        other.viewCount == viewCount &&
+        other.rating == rating &&
+        other.ratingCount == ratingCount &&
+        other.relatedDocuments == relatedDocuments &&
+        other.metadata == metadata;
   }
 
   @override
   int get hashCode {
     return id.hashCode ^
-      title.hashCode ^
-      content.hashCode ^
-      category.hashCode ^
-      order.hashCode ^
-      tags.hashCode ^
-      author.hashCode ^
-      createdAt.hashCode ^
-      updatedAt.hashCode ^
-      isPublished.hashCode ^
-      viewCount.hashCode ^
-      rating.hashCode ^
-      ratingCount.hashCode ^
-      relatedDocuments.hashCode ^
-      metadata.hashCode;
+        title.hashCode ^
+        content.hashCode ^
+        category.hashCode ^
+        order.hashCode ^
+        tags.hashCode ^
+        author.hashCode ^
+        createdAt.hashCode ^
+        updatedAt.hashCode ^
+        isPublished.hashCode ^
+        viewCount.hashCode ^
+        rating.hashCode ^
+        ratingCount.hashCode ^
+        relatedDocuments.hashCode ^
+        metadata.hashCode;
   }
-} 
+}

@@ -1,23 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/community_controller.dart';
-import '../models/post_model.dart';
-import '../models/comment_model.dart';
-import '../models/user_model.dart';
-import '../controllers/auth_controller.dart';
-import '../widgets/loading_overlay.dart';
-import '../widgets/error_view.dart';
-import '../utils/page_transitions.dart';
 import '../models/channel_model.dart';
 import 'channel_page.dart';
-import 'post_detail_page.dart';
 
 class CommunityPage extends StatelessWidget {
-  final CommunityController _controller = Get.put(CommunityController());
-  final AuthController _authController = Get.find<AuthController>();
+  final CommunityController controller = Get.find<CommunityController>();
 
-  CommunityPage({Key? key}) : super(key: key);
+  CommunityPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -26,30 +16,42 @@ class CommunityPage extends StatelessWidget {
         title: const Text('社区'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _controller.loadChannels(),
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              // TODO: 实现搜索功能
+            },
           ),
         ],
       ),
       body: Obx(() {
-        if (_controller.isLoading) {
+        if (controller.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (_controller.channels.isEmpty) {
-          return const Center(
-            child: Text(
-              '暂无频道',
-              style: TextStyle(fontSize: 16),
+        if (controller.channels.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.forum_outlined, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text('暂无频道'),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () => _showCreateChannelDialog(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('创建频道'),
+                ),
+              ],
             ),
           );
         }
 
         return ListView.builder(
-          itemCount: _controller.channels.length,
+          itemCount: controller.channels.length,
           itemBuilder: (context, index) {
-            final channel = _controller.channels[index];
-            return _buildChannelCard(channel);
+            final channel = controller.channels[index];
+            return _buildChannelCard(context, channel);
           },
         );
       }),
@@ -60,67 +62,48 @@ class CommunityPage extends StatelessWidget {
     );
   }
 
-  Widget _buildChannelCard(ChannelModel channel) {
+  Widget _buildChannelCard(BuildContext context, ChannelModel channel) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: InkWell(
-        onTap: () => Get.to(() => ChannelPage(channelId: channel.id!)),
+        onTap: () => Get.to(() => ChannelPage(channel: channel)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                Image.network(
-                  channel.coverImage,
-                  width: double.infinity,
-                  height: 120,
-                  fit: BoxFit.cover,
-                ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.7),
-                        ],
-                      ),
-                    ),
-                    child: Text(
-                      channel.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            if (channel.coverImage != null)
+              Image.network(
+                channel.coverImage!,
+                height: 120,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
+                    channel.name,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
                     channel.description,
+                    style: Theme.of(context).textTheme.bodyMedium,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('帖子：${channel.postCount}'),
-                      Text('成员：${channel.memberCount}'),
-                    ],
+                  Wrap(
+                    spacing: 8,
+                    children: channel.tags
+                        .map((tag) => Chip(
+                              label: Text(tag),
+                              backgroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                            ))
+                        .toList(),
                   ),
                 ],
               ),
@@ -131,12 +114,14 @@ class CommunityPage extends StatelessWidget {
     );
   }
 
-  Future<void> _showCreateChannelDialog(BuildContext context) async {
+  void _showCreateChannelDialog(BuildContext context) {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
-    final themeColorController = TextEditingController(text: '#2196F3');
+    String? coverImage;
+    bool isPrivate = false;
+    const List<String> tags = [];
 
-    return showDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('创建频道'),
@@ -148,58 +133,45 @@ class CommunityPage extends StatelessWidget {
                 controller: nameController,
                 decoration: const InputDecoration(
                   labelText: '频道名称',
-                  hintText: '请输入频道名称',
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: descriptionController,
                 decoration: const InputDecoration(
-                  labelText: '频道描述',
-                  hintText: '请输入频道描述',
+                  labelText: '描述',
                 ),
                 maxLines: 3,
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: themeColorController,
-                decoration: const InputDecoration(
-                  labelText: '主题颜色',
-                  hintText: '请输入十六进制颜色代码',
-                ),
+              SwitchListTile(
+                title: const Text('私密频道'),
+                value: isPrivate,
+                onChanged: (value) {
+                  isPrivate = value;
+                },
               ),
             ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Get.back(),
+            onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
           ),
-          TextButton(
-            onPressed: () async {
+          ElevatedButton(
+            onPressed: () {
               if (nameController.text.isEmpty) {
-                Get.snackbar(
-                  '错误',
-                  '请输入频道名称',
-                  snackPosition: SnackPosition.BOTTOM,
-                );
+                Get.snackbar('错误', '请输入频道名称');
                 return;
               }
-
-              final channel = ChannelModel(
+              controller.createChannel(
                 name: nameController.text,
                 description: descriptionController.text,
-                coverImage: 'https://via.placeholder.com/300x120',
-                themeColor: themeColorController.text,
-                ownerId: 1, // TODO: 使用当前用户ID
-                moderatorId: 1, // TODO: 使用当前用户ID
-                createdAt: DateTime.now(),
-                updatedAt: DateTime.now(),
+                coverImage: coverImage,
+                isPrivate: isPrivate,
+                tags: tags,
               );
-
-              await _controller.createChannel(channel);
-              Get.back();
             },
             child: const Text('创建'),
           ),
@@ -207,4 +179,4 @@ class CommunityPage extends StatelessWidget {
       ),
     );
   }
-} 
+}

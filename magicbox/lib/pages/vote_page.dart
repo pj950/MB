@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/vote_controller.dart';
 import '../models/vote_model.dart';
-import '../models/vote_option_model.dart';
 
 class VotePage extends StatelessWidget {
   final VoteController _controller = Get.put(VoteController());
 
-  VotePage({Key? key}) : super(key: key);
+  VotePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +189,8 @@ class VotePage extends StatelessWidget {
               else
                 _buildVoteResults(vote),
               const SizedBox(height: 16),
-              if (vote.status == 'active' && vote.creatorId == _controller.currentUser?.id)
+              if (vote.status == 'active' &&
+                  vote.creatorId == _controller.currentUser?.id)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -244,17 +244,17 @@ class VotePage extends StatelessWidget {
               onChanged: (value) {
                 if (value ?? false) {
                   if (vote.isMultipleChoice) {
-                    selectedOptionIds.add(option.id!);
+                    selectedOptionIds.add(int.parse(option.id));
                   } else {
                     selectedOptionIds.clear();
-                    selectedOptionIds.add(option.id!);
+                    selectedOptionIds.add(int.parse(option.id));
                   }
                 } else {
                   selectedOptionIds.remove(option.id);
                 }
               },
             );
-          }).toList(),
+          }),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -310,7 +310,8 @@ class VotePage extends StatelessWidget {
                         option.content,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: isVoted ? FontWeight.bold : FontWeight.normal,
+                          fontWeight:
+                              isVoted ? FontWeight.bold : FontWeight.normal,
                           color: isVoted ? Colors.blue : Colors.black,
                         ),
                       ),
@@ -335,7 +336,7 @@ class VotePage extends StatelessWidget {
                 const SizedBox(height: 8),
               ],
             );
-          }).toList(),
+          }),
           Text(
             '总票数：${vote.totalVotes}',
             style: const TextStyle(
@@ -394,7 +395,8 @@ class VotePage extends StatelessWidget {
                           context: context,
                           initialDate: DateTime.now(),
                           firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
                         );
                         if (date != null) {
                           final time = await showTimePicker(
@@ -423,9 +425,11 @@ class VotePage extends StatelessWidget {
                       onPressed: () async {
                         final date = await showDatePicker(
                           context: context,
-                          initialDate: DateTime.now().add(const Duration(days: 1)),
+                          initialDate:
+                              DateTime.now().add(const Duration(days: 1)),
                           firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
                         );
                         if (date != null) {
                           final time = await showTimePicker(
@@ -443,9 +447,8 @@ class VotePage extends StatelessWidget {
                           }
                         }
                       },
-                      child: Text(endTime == null
-                          ? '选择结束时间'
-                          : _formatDate(endTime!)),
+                      child: Text(
+                          endTime == null ? '选择结束时间' : _formatDate(endTime!)),
                     ),
                   ),
                 ],
@@ -485,7 +488,7 @@ class VotePage extends StatelessWidget {
                     ),
                   ),
                 );
-              }).toList(),
+              }),
               TextButton(
                 onPressed: () {
                   optionControllers.add(TextEditingController());
@@ -620,4 +623,4 @@ class VotePage extends StatelessWidget {
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
-} 
+}

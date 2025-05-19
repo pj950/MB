@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class ContentReportModel {
   final int? id;
   final int reporterId;
@@ -138,4 +136,4 @@ class ContentReviewModel {
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
-} 
+}

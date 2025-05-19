@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class VoteModel {
   final int? id;
   final int channelId;
@@ -72,8 +70,8 @@ class VoteModel {
       'description': description,
       'start_time': startTime.toIso8601String(),
       'end_time': endTime.toIso8601String(),
-      'is_multiple_choice': isMultipleChoice ? 1 : 0,
-      'is_anonymous': isAnonymous ? 1 : 0,
+      'ismultiple_choice': isMultipleChoice ? 1 : 0,
+      'isanonymous': isAnonymous ? 1 : 0,
       'status': status,
       'total_votes': totalVotes,
       'created_at': createdAt.toIso8601String(),
@@ -90,8 +88,8 @@ class VoteModel {
       description: map['description'] as String,
       startTime: DateTime.parse(map['start_time'] as String),
       endTime: DateTime.parse(map['end_time'] as String),
-      isMultipleChoice: map['is_multiple_choice'] == 1,
-      isAnonymous: map['is_anonymous'] == 1,
+      isMultipleChoice: map['ismultiple_choice'] == 1,
+      isAnonymous: map['isanonymous'] == 1,
       status: map['status'] as String,
       totalVotes: map['total_votes'] as int,
       createdAt: DateTime.parse(map['created_at'] as String),
@@ -204,8 +202,11 @@ class VoteRecordModel {
       id: map['id'] as int,
       voteId: map['vote_id'] as int,
       userId: map['user_id'] as int,
-      optionIds: (map['option_ids'] as String).split(',').map((e) => int.parse(e)).toList(),
+      optionIds: (map['option_ids'] as String)
+          .split(',')
+          .map((e) => int.parse(e))
+          .toList(),
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
-} 
+}

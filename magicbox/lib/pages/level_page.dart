@@ -6,7 +6,7 @@ import '../models/level_model.dart';
 class LevelPage extends StatelessWidget {
   final LevelController _controller = Get.put(LevelController());
 
-  LevelPage({Key? key}) : super(key: key);
+  LevelPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +132,9 @@ class LevelPage extends StatelessWidget {
   Widget _buildLevelProgress() {
     final currentLevel = _controller.getCurrentLevel();
     final nextLevel = _controller.getNextLevel();
-    if (currentLevel == null || nextLevel == null) return const SizedBox.shrink();
+    if (currentLevel == null || nextLevel == null) {
+      return const SizedBox.shrink();
+    }
 
     final progress = _controller.getLevelProgress();
     final currentExp = _controller.userLevel.value!.totalExp;
@@ -207,7 +209,8 @@ class LevelPage extends StatelessWidget {
               itemCount: _controller.levels.length,
               itemBuilder: (context, index) {
                 final level = _controller.levels[index];
-                final isCurrentLevel = level.level == _controller.userLevel.value?.level;
+                final isCurrentLevel =
+                    level.level == _controller.userLevel.value?.level;
                 return _buildLevelItem(level, isCurrentLevel);
               },
             ),
@@ -234,7 +237,8 @@ class LevelPage extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: isCurrentLevel ? Colors.blue : Colors.grey.withOpacity(0.1),
+              color:
+                  isCurrentLevel ? Colors.blue : Colors.grey.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -306,4 +310,4 @@ class LevelPage extends StatelessWidget {
       ),
     );
   }
-} 
+}

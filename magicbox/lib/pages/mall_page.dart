@@ -7,7 +7,7 @@ import '../models/order_model.dart';
 class MallPage extends StatelessWidget {
   final MallController _controller = Get.put(MallController());
 
-  MallPage({Key? key}) : super(key: key);
+  MallPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +39,7 @@ class MallPage extends StatelessWidget {
         _buildFilterBar(),
         Expanded(
           child: Obx(() {
-            if (_controller.isLoading) {
+            if (_controller.isLoading.value) {
               return const Center(child: CircularProgressIndicator());
             }
 
@@ -184,7 +184,7 @@ class MallPage extends StatelessWidget {
 
   Widget _buildOrdersTab() {
     return Obx(() {
-      if (_controller.isLoading) {
+      if (_controller.isLoading.value) {
         return const Center(child: CircularProgressIndicator());
       }
 
@@ -260,28 +260,28 @@ class MallPage extends StatelessWidget {
     );
   }
 
-  Widget _buildOrderStatus(String status) {
+  Widget _buildOrderStatus(OrderStatus status) {
     Color color;
     String text;
 
     switch (status) {
-      case 'pending':
+      case OrderStatus.PENDING:
         color = Colors.orange;
         text = '待支付';
         break;
-      case 'paid':
+      case OrderStatus.PAID:
         color = Colors.blue;
         text = '已支付';
         break;
-      case 'shipped':
+      case OrderStatus.SHIPPED:
         color = Colors.purple;
         text = '已发货';
         break;
-      case 'completed':
+      case OrderStatus.COMPLETED:
         color = Colors.green;
         text = '已完成';
         break;
-      case 'cancelled':
+      case OrderStatus.CANCELLED:
         color = Colors.red;
         text = '已取消';
         break;
@@ -375,9 +375,10 @@ class MallPage extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                if (shippingAddress?.isNotEmpty ?? false) {
+                if (shippingAddress?.isNotEmpty == true) {
                   Get.back();
-                  _controller.purchaseItem(item, shippingAddress: shippingAddress);
+                  _controller.purchaseItem(item,
+                      shippingAddress: shippingAddress);
                 } else {
                   Get.snackbar(
                     '错误',
@@ -396,13 +397,13 @@ class MallPage extends StatelessWidget {
     }
   }
 
-  String _getCurrencySymbol(String currency) {
+  String _getCurrencySymbol(CurrencyType currency) {
     switch (currency) {
-      case 'points':
+      case CurrencyType.POINTS:
         return '积分';
-      case 'coins':
+      case CurrencyType.COINS:
         return '金币';
-      case 'rmb':
+      case CurrencyType.RMB:
         return '元';
       default:
         return '';
@@ -412,4 +413,4 @@ class MallPage extends StatelessWidget {
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
-} 
+}

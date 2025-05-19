@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:image/image.dart' as img;
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'package:path/path.dart' as path;
+import 'package:image/image.dart' as img;
 
 class ImageCacheService {
   static final ImageCacheService _instance = ImageCacheService._internal();
@@ -29,7 +29,7 @@ class ImageCacheService {
     final cacheKey = _getCacheKey(imagePath);
     final cacheDir = await _cacheDir;
     final cachedPath = path.join(cacheDir, cacheKey);
-    
+
     if (await File(cachedPath).exists()) {
       return cachedPath;
     }
@@ -80,10 +80,10 @@ class ImageCacheService {
     final cacheKey = _getCacheKey(imagePath);
     final cacheDir = await _cacheDir;
     final cachedPath = path.join(cacheDir, cacheKey);
-    
+
     final file = File(cachedPath);
     if (await file.exists()) {
       await file.delete();
     }
   }
-} 
+}

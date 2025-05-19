@@ -1,11 +1,13 @@
 import 'package:get/get.dart';
+import 'package:sqflite/sqflite.dart';
 import '../services/database_service.dart';
 import '../models/statistics_model.dart';
 import '../models/user_model.dart';
+import '../controllers/auth_controller.dart';
 
 class StatisticsController extends GetxController {
   final DatabaseService _databaseService = Get.find<DatabaseService>();
-  final UserModel currentUser = Get.find<UserModel>();
+  final AuthController _authController = Get.find<AuthController>();
 
   final Rx<UserStatistics?> userStatistics = Rx<UserStatistics?>(null);
   final Rx<ContentStatistics?> contentStatistics = Rx<ContentStatistics?>(null);

@@ -12,6 +12,8 @@ class MallController extends GetxController {
   final RxList<OrderModel> orders = <OrderModel>[].obs;
   final RxBool isLoading = false.obs;
   final Rx<MallItemModel?> currentItem = Rx<MallItemModel?>(null);
+  final RxString currentType = 'all'.obs;
+  final RxString currentCurrency = 'all'.obs;
 
   @override
   void onInit() {
@@ -20,6 +22,16 @@ class MallController extends GetxController {
     if (currentUser != null) {
       loadOrders();
     }
+  }
+
+  void setType(String type) {
+    currentType.value = type;
+    loadItems(type: type, currency: currentCurrency.value);
+  }
+
+  void setCurrency(String currency) {
+    currentCurrency.value = currency;
+    loadItems(type: currentType.value, currency: currency);
   }
 
   Future<void> loadItems({
@@ -50,7 +62,8 @@ class MallController extends GetxController {
 
     try {
       isLoading.value = true;
-      orders.value = await _databaseService.getUserOrders(currentUser!.id!);
+      orders.value =
+          await _databaseService.getUserOrders(currentUser!.id!.toString());
     } catch (e) {
       Get.snackbar(
         '错误',
@@ -62,7 +75,8 @@ class MallController extends GetxController {
     }
   }
 
-  Future<void> purchaseItem(int itemId, int quantity) async {
+  Future<void> purchaseItem(MallItemModel item,
+      {String? shippingAddress}) async {
     if (currentUser == null) {
       Get.snackbar(
         '错误',
@@ -75,52 +89,48 @@ class MallController extends GetxController {
     try {
       isLoading.value = true;
 
-      // 获取商品信息
-      final item = await _databaseService.getMallItem(itemId);
-      if (item == null) {
-        throw Exception('商品不存在');
-      }
-
       // 检查库存
-      if (item.stock < quantity) {
+      if (item.stock < 1) {
         throw Exception('库存不足');
       }
 
       // 检查用户余额
-      if (item.currency == 'coins' && currentUser!.coins < item.price * quantity) {
+      if (item.currency == 'coins' && currentUser!.coins < item.price) {
         throw Exception('金币不足');
-      } else if (item.currency == 'points' && currentUser!.points < item.price * quantity) {
+      } else if (item.currency == 'points' &&
+          currentUser!.points < item.price) {
         throw Exception('积分不足');
       }
 
       // 创建订单
       final order = OrderModel(
         userId: currentUser!.id!,
-        itemId: itemId,
+        itemId: item.id,
         orderNumber: _generateOrderNumber(),
-        amount: item.price * quantity,
+        amount: item.price,
         currency: item.currency,
-        status: 'pending',
+        status: OrderStatus.PENDING,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        shippingAddress: shippingAddress,
       );
 
       await _databaseService.createOrder(order);
 
       // 更新库存
-      await _databaseService.updateMallItemStock(itemId, quantity);
+      await _databaseService.updateMallItemStock(int.parse(item.id), 1);
 
       // 更新用户余额
       if (item.currency == 'coins') {
         await _databaseService.updateUser(
           currentUser!.copyWith(
-            coins: currentUser!.coins - (item.price * quantity),
+            coins: currentUser!.coins - item.price.toInt(),
           ),
         );
       } else if (item.currency == 'points') {
         await _databaseService.updateUser(
           currentUser!.copyWith(
-            points: currentUser!.points - (item.price * quantity),
+            points: currentUser!.points - item.price.toInt(),
           ),
         );
       }
@@ -164,22 +174,22 @@ class MallController extends GetxController {
       await _databaseService.updateOrderStatus(orderNumber, 'cancelled');
 
       // 恢复库存
-      final item = await _databaseService.getMallItem(order.itemId);
+      final item = await _databaseService.getMallItem(int.parse(order.itemId));
       if (item != null) {
-        await _databaseService.updateMallItemStock(item.id!, -1);
+        await _databaseService.updateMallItemStock(int.parse(item.id), -1);
       }
 
       // 恢复用户余额
       if (order.currency == 'coins') {
         await _databaseService.updateUser(
           currentUser!.copyWith(
-            coins: currentUser!.coins + order.amount,
+            coins: currentUser!.coins + order.amount.toInt(),
           ),
         );
       } else if (order.currency == 'points') {
         await _databaseService.updateUser(
           currentUser!.copyWith(
-            points: currentUser!.points + order.amount,
+            points: currentUser!.points + order.amount.toInt(),
           ),
         );
       }
@@ -209,4 +219,4 @@ class MallController extends GetxController {
     final random = (1000 + DateTime.now().microsecond % 9000).toString();
     return 'MB$timestamp$random';
   }
-} 
+}

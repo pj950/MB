@@ -15,7 +15,7 @@ class SpeechController extends GetxController {
 
   // 开始语音识别
   void startListening() async {
-    bool available = await speech.initialize();
+    final bool available = await speech.initialize();
     if (available) {
       isListening.value = true;
       speech.listen(onResult: (val) {

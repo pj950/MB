@@ -79,7 +79,7 @@ class SearchResultModel {
       'updated_at': updatedAt.toIso8601String(),
       'relevance_score': relevanceScore,
       'tags': tags,
-      'is_active': isActive,
+      'isactive': isActive,
     };
   }
 
@@ -98,7 +98,7 @@ class SearchResultModel {
       updatedAt: DateTime.parse(map['updated_at'] as String),
       relevanceScore: map['relevance_score'] as double?,
       tags: (map['tags'] as List<dynamic>?)?.map((e) => e as String).toList(),
-      isActive: map['is_active'] as bool? ?? true,
+      isActive: map['isactive'] as bool? ?? true,
     );
   }
 
@@ -110,33 +110,33 @@ class SearchResultModel {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-  
+
     return other is SearchResultModel &&
-      other.id == id &&
-      other.type == type &&
-      other.title == title &&
-      other.description == description &&
-      other.imageUrl == imageUrl &&
-      other.metadata == metadata &&
-      other.createdAt == createdAt &&
-      other.updatedAt == updatedAt &&
-      other.relevanceScore == relevanceScore &&
-      other.tags == tags &&
-      other.isActive == isActive;
+        other.id == id &&
+        other.type == type &&
+        other.title == title &&
+        other.description == description &&
+        other.imageUrl == imageUrl &&
+        other.metadata == metadata &&
+        other.createdAt == createdAt &&
+        other.updatedAt == updatedAt &&
+        other.relevanceScore == relevanceScore &&
+        other.tags == tags &&
+        other.isActive == isActive;
   }
 
   @override
   int get hashCode {
     return id.hashCode ^
-      type.hashCode ^
-      title.hashCode ^
-      description.hashCode ^
-      imageUrl.hashCode ^
-      metadata.hashCode ^
-      createdAt.hashCode ^
-      updatedAt.hashCode ^
-      relevanceScore.hashCode ^
-      tags.hashCode ^
-      isActive.hashCode;
+        type.hashCode ^
+        title.hashCode ^
+        description.hashCode ^
+        imageUrl.hashCode ^
+        metadata.hashCode ^
+        createdAt.hashCode ^
+        updatedAt.hashCode ^
+        relevanceScore.hashCode ^
+        tags.hashCode ^
+        isActive.hashCode;
   }
-} 
+}

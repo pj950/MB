@@ -84,7 +84,7 @@ class FAQModel {
       'author': author,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
-      'is_published': isPublished,
+      'ispublished': isPublished,
       'view_count': viewCount,
       'helpful_count': helpfulCount,
       'not_helpful_count': notHelpfulCount,
@@ -104,11 +104,13 @@ class FAQModel {
       author: map['author'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
-      isPublished: map['is_published'] as bool? ?? true,
+      isPublished: map['ispublished'] as bool? ?? true,
       viewCount: map['view_count'] as int? ?? 0,
       helpfulCount: map['helpful_count'] as int? ?? 0,
       notHelpfulCount: map['not_helpful_count'] as int? ?? 0,
-      relatedFAQs: (map['related_faqs'] as List<dynamic>?)?.map((e) => e as String).toList(),
+      relatedFAQs: (map['related_faqs'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
       metadata: map['metadata'] as Map<String, dynamic>?,
     );
   }
@@ -121,41 +123,41 @@ class FAQModel {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-  
+
     return other is FAQModel &&
-      other.id == id &&
-      other.question == question &&
-      other.answer == answer &&
-      other.category == category &&
-      other.order == order &&
-      other.tags == tags &&
-      other.author == author &&
-      other.createdAt == createdAt &&
-      other.updatedAt == updatedAt &&
-      other.isPublished == isPublished &&
-      other.viewCount == viewCount &&
-      other.helpfulCount == helpfulCount &&
-      other.notHelpfulCount == notHelpfulCount &&
-      other.relatedFAQs == relatedFAQs &&
-      other.metadata == metadata;
+        other.id == id &&
+        other.question == question &&
+        other.answer == answer &&
+        other.category == category &&
+        other.order == order &&
+        other.tags == tags &&
+        other.author == author &&
+        other.createdAt == createdAt &&
+        other.updatedAt == updatedAt &&
+        other.isPublished == isPublished &&
+        other.viewCount == viewCount &&
+        other.helpfulCount == helpfulCount &&
+        other.notHelpfulCount == notHelpfulCount &&
+        other.relatedFAQs == relatedFAQs &&
+        other.metadata == metadata;
   }
 
   @override
   int get hashCode {
     return id.hashCode ^
-      question.hashCode ^
-      answer.hashCode ^
-      category.hashCode ^
-      order.hashCode ^
-      tags.hashCode ^
-      author.hashCode ^
-      createdAt.hashCode ^
-      updatedAt.hashCode ^
-      isPublished.hashCode ^
-      viewCount.hashCode ^
-      helpfulCount.hashCode ^
-      notHelpfulCount.hashCode ^
-      relatedFAQs.hashCode ^
-      metadata.hashCode;
+        question.hashCode ^
+        answer.hashCode ^
+        category.hashCode ^
+        order.hashCode ^
+        tags.hashCode ^
+        author.hashCode ^
+        createdAt.hashCode ^
+        updatedAt.hashCode ^
+        isPublished.hashCode ^
+        viewCount.hashCode ^
+        helpfulCount.hashCode ^
+        notHelpfulCount.hashCode ^
+        relatedFAQs.hashCode ^
+        metadata.hashCode;
   }
-} 
+}

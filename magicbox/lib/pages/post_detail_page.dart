@@ -3,13 +3,17 @@ import 'package:get/get.dart';
 import '../controllers/community_controller.dart';
 import '../models/post_model.dart';
 import '../models/comment_model.dart';
+import '../models/user_model.dart';
+import '../services/database_service.dart';
 
 class PostDetailPage extends StatelessWidget {
   final int postId;
   final CommunityController _controller = Get.find<CommunityController>();
+  final DatabaseService _databaseService = Get.find<DatabaseService>();
   final TextEditingController _commentController = TextEditingController();
+  final UserModel? currentUser = Get.find<UserModel?>();
 
-  PostDetailPage({Key? key, required this.postId}) : super(key: key) {
+  PostDetailPage({super.key, required this.postId}) {
     _controller.loadComments(postId);
   }
 
@@ -109,7 +113,7 @@ class PostDetailPage extends StatelessWidget {
               children: post.tags!.map((tag) {
                 return Chip(
                   label: Text(tag),
-                  backgroundColor: Colors.blue.withOpacity(0.1),
+                  backgroundColor: Colors.blue.withAlpha(26),
                 );
               }).toList(),
             ),
@@ -122,7 +126,7 @@ class PostDetailPage extends StatelessWidget {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.thumb_up_outlined),
-                    onPressed: () => _controller.likePost(1, post.id!),
+                    onPressed: () => _controller.likePost(postId),
                   ),
                   Text('${post.likeCount}'),
                 ],
@@ -181,15 +185,20 @@ class PostDetailPage extends StatelessWidget {
                     return;
                   }
 
-                  final comment = CommentModel(
-                    postId: postId,
-                    authorId: 1, // TODO: 使用当前用户ID
-                    content: _commentController.text,
-                    createdAt: DateTime.now(),
-                    updatedAt: DateTime.now(),
-                  );
+                  if (currentUser == null) {
+                    Get.snackbar(
+                      '错误',
+                      '请先登录',
+                      snackPosition: SnackPosition.BOTTOM,
+                    );
+                    return;
+                  }
 
-                  _controller.createComment(comment);
+                  _controller.createComment(
+                    postId: postId,
+                    userId: currentUser!.id!,
+                    content: _commentController.text,
+                  );
                   _commentController.clear();
                 },
               ),
@@ -232,11 +241,19 @@ class PostDetailPage extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '用户 ${comment.authorId}', // TODO: 显示用户名
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                FutureBuilder<UserModel?>(
+                  future: _databaseService.getUser(comment.authorId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Text('加载中...');
+                    }
+                    return Text(
+                      snapshot.data?.username ?? '未知用户',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    );
+                  },
                 ),
                 Text(
                   _formatDate(comment.createdAt),
@@ -251,18 +268,11 @@ class PostDetailPage extends StatelessWidget {
             Text(comment.content),
             const SizedBox(height: 8),
             Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.thumb_up_outlined),
-                  onPressed: () => _controller.likeComment(1, comment.id!),
-                ),
-                Text('${comment.likeCount}'),
-                const SizedBox(width: 16),
-                IconButton(
-                  icon: const Icon(Icons.reply),
-                  onPressed: () {
-                    // TODO: 实现回复功能
-                  },
+                TextButton(
+                  onPressed: () => _showReplyDialog(comment),
+                  child: const Text('回复'),
                 ),
               ],
             ),
@@ -272,18 +282,60 @@ class PostDetailPage extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
+  void _showReplyDialog(CommentModel parentComment) {
+    final TextEditingController replyController = TextEditingController();
 
-    if (difference.inDays > 0) {
-      return '${difference.inDays}天前';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}小时前';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}分钟前';
-    } else {
-      return '刚刚';
-    }
+    Get.dialog(
+      AlertDialog(
+        title: const Text('回复评论'),
+        content: TextField(
+          controller: replyController,
+          decoration: const InputDecoration(
+            hintText: '写下你的回复...',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (replyController.text.isEmpty) {
+                Get.snackbar(
+                  '错误',
+                  '请输入回复内容',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+                return;
+              }
+
+              if (currentUser == null) {
+                Get.snackbar(
+                  '错误',
+                  '请先登录',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+                return;
+              }
+
+              _controller.createComment(
+                postId: postId,
+                userId: currentUser!.id!,
+                content: replyController.text,
+              );
+              Get.back();
+            },
+            child: const Text('发送'),
+          ),
+        ],
+      ),
+    );
   }
-} 
+
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+}

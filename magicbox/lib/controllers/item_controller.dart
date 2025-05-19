@@ -1,7 +1,10 @@
 import 'package:get/get.dart';
+import 'package:flutter/material.dart';
+import 'dart:io';
 import '../models/item_model.dart';
 import '../services/database_service.dart';
 import '../services/file_service.dart';
+import 'package:uuid/uuid.dart';
 
 class ItemController extends GetxController {
   final DatabaseService _db = DatabaseService();
@@ -30,55 +33,47 @@ class ItemController extends GetxController {
     }
   }
 
-  List<ItemModel> getItemsByBox(int boxId) {
-    return _items.where((item) => item.boxId == boxId).toList();
+  Future<List<ItemModel>> getItemsByBox(String boxId) async {
+    try {
+      return await _db.getItemsByBox(boxId);
+    } catch (e) {
+      Get.snackbar('错误', '获取物品失败：$e');
+      return [];
+    }
   }
 
   Future<void> createItem({
-    required int boxId,
+    required String boxId,
     required String name,
-    String? description,
-    List<String> imageUrls = const [],
-    DateTime? purchaseDate,
-    double? purchasePrice,
-    double? currentPrice,
-    String? brand,
-    String? model,
-    String? serialNumber,
-    String? qrCode,
-    String? nfcTag,
-    String? color,
-    String? size,
-    double? weight,
-    int? conditionRating,
+    required String description,
+    String? imagePath,
+    bool isPublic = false,
+    Map<String, dynamic>? shareSettings,
+    Map<String, dynamic>? advancedProperties,
+    List<String> tags = const [],
     bool isFavorite = false,
   }) async {
     _isLoading.value = true;
     try {
+      final now = DateTime.now();
       final item = ItemModel(
+        id: const Uuid().v4(),
         boxId: boxId,
         name: name,
         description: description,
-        imageUrls: imageUrls,
-        purchaseDate: purchaseDate,
-        purchasePrice: purchasePrice,
-        currentPrice: currentPrice,
-        brand: brand,
-        model: model,
-        serialNumber: serialNumber,
-        qrCode: qrCode,
-        nfcTag: nfcTag,
-        color: color,
-        size: size,
-        weight: weight,
-        conditionRating: conditionRating,
+        imagePath: imagePath ?? 'assets/images/placeholder.png',
+        createdAt: now,
+        updatedAt: now,
+        isPublic: isPublic,
+        shareSettings: shareSettings,
+        advancedProperties: advancedProperties,
+        tags: tags,
         isFavorite: isFavorite,
       );
-      
-      final itemId = await _db.insertItem(item);
-      item.id = itemId;
+
+      await _db.insertItem(item);
       _items.add(item);
-      
+
       Get.back();
       Get.snackbar('成功', '物品创建成功');
     } catch (e) {
@@ -105,12 +100,14 @@ class ItemController extends GetxController {
     }
   }
 
-  Future<void> deleteItem(int itemId) async {
+  Future<void> deleteItem(String itemId) async {
     _isLoading.value = true;
     try {
       final item = _items.firstWhere((i) => i.id == itemId);
-      await _fileService.deleteImages(item.imageUrls);
-      await _db.deleteItem(itemId);
+      if (item.imagePath != 'assets/images/placeholder.png') {
+        await _fileService.deleteImage(item.imagePath);
+      }
+      await _db.deleteItem(int.parse(itemId));
       _items.removeWhere((item) => item.id == itemId);
       Get.back();
       Get.snackbar('成功', '物品删除成功');
@@ -138,21 +135,13 @@ class ItemController extends GetxController {
     }
   }
 
-  void showCreateItemDialog(int boxId) {
+  void showCreateItemDialog(String boxId) {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
-    final brandController = TextEditingController();
-    final modelController = TextEditingController();
-    final serialNumberController = TextEditingController();
-    final colorController = TextEditingController();
-    final sizeController = TextEditingController();
-    final weightController = TextEditingController();
-    final purchasePriceController = TextEditingController();
-    final currentPriceController = TextEditingController();
-    DateTime? purchaseDate;
-    int? conditionRating;
+    String? imagePath;
+    bool isPublic = false;
     bool isFavorite = false;
-    List<String> imageUrls = [];
+    const List<String> tags = [];
 
     Get.dialog(
       AlertDialog(
@@ -177,98 +166,12 @@ class ItemController extends GetxController {
                   maxLines: 3,
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: brandController,
-                  decoration: const InputDecoration(
-                    labelText: '品牌（选填）',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: modelController,
-                  decoration: const InputDecoration(
-                    labelText: '型号（选填）',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: serialNumberController,
-                  decoration: const InputDecoration(
-                    labelText: '序列号（选填）',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: colorController,
-                  decoration: const InputDecoration(
-                    labelText: '颜色（选填）',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: sizeController,
-                  decoration: const InputDecoration(
-                    labelText: '尺寸（选填）',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: weightController,
-                  decoration: const InputDecoration(
-                    labelText: '重量（选填）',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: purchasePriceController,
-                  decoration: const InputDecoration(
-                    labelText: '购买价格（选填）',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: currentPriceController,
-                  decoration: const InputDecoration(
-                    labelText: '当前价格（选填）',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  title: const Text('购买日期'),
-                  subtitle: Text(
-                    purchaseDate?.toString().split(' ')[0] ?? '未设置',
-                  ),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now(),
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime.now(),
-                    );
-                    if (date != null) {
-                      setState(() => purchaseDate = date);
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
-                  value: conditionRating,
-                  items: List.generate(5, (index) {
-                    return DropdownMenuItem(
-                      value: index + 1,
-                      child: Text('${index + 1}星'),
-                    );
-                  }),
+                SwitchListTile(
+                  title: const Text('公开'),
+                  value: isPublic,
                   onChanged: (value) {
-                    setState(() => conditionRating = value);
+                    setState(() => isPublic = value);
                   },
-                  decoration: const InputDecoration(
-                    labelText: '物品状况',
-                  ),
                 ),
                 const SizedBox(height: 16),
                 SwitchListTile(
@@ -284,51 +187,39 @@ class ItemController extends GetxController {
                     final paths = await uploadImages();
                     if (paths.isNotEmpty) {
                       setState(() {
-                        imageUrls.addAll(paths);
+                        imagePath = paths.first;
                       });
                     }
                   },
                   icon: const Icon(Icons.add_photo_alternate),
                   label: const Text('添加图片'),
                 ),
-                if (imageUrls.isNotEmpty) ...[
+                if (imagePath != null) ...[
                   const SizedBox(height: 16),
-                  SizedBox(
-                    height: 100,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: imageUrls.length,
-                      itemBuilder: (context, index) {
-                        return Stack(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: Image.file(
-                                File(imageUrls[index]),
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            Positioned(
-                              right: 0,
-                              top: 0,
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.close,
-                                  color: Colors.red,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    imageUrls.removeAt(index);
-                                  });
-                                },
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
+                  Stack(
+                    children: [
+                      Image.file(
+                        File(imagePath!),
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.close,
+                            color: Colors.red,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              imagePath = null;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],
@@ -349,37 +240,11 @@ class ItemController extends GetxController {
               createItem(
                 boxId: boxId,
                 name: nameController.text,
-                description: descriptionController.text.isEmpty
-                    ? null
-                    : descriptionController.text,
-                brand: brandController.text.isEmpty
-                    ? null
-                    : brandController.text,
-                model: modelController.text.isEmpty
-                    ? null
-                    : modelController.text,
-                serialNumber: serialNumberController.text.isEmpty
-                    ? null
-                    : serialNumberController.text,
-                color: colorController.text.isEmpty
-                    ? null
-                    : colorController.text,
-                size: sizeController.text.isEmpty
-                    ? null
-                    : sizeController.text,
-                weight: weightController.text.isEmpty
-                    ? null
-                    : double.tryParse(weightController.text),
-                purchasePrice: purchasePriceController.text.isEmpty
-                    ? null
-                    : double.tryParse(purchasePriceController.text),
-                currentPrice: currentPriceController.text.isEmpty
-                    ? null
-                    : double.tryParse(currentPriceController.text),
-                purchaseDate: purchaseDate,
-                conditionRating: conditionRating,
+                description: descriptionController.text,
+                imagePath: imagePath,
+                isPublic: isPublic,
                 isFavorite: isFavorite,
-                imageUrls: imageUrls,
+                tags: tags,
               );
             },
             child: const Text('创建'),
@@ -387,5 +252,14 @@ class ItemController extends GetxController {
         ],
       ),
     );
+  }
+
+  Future<ItemModel?> getItem(String id) async {
+    try {
+      return await _db.getItem(int.parse(id));
+    } catch (e) {
+      Get.snackbar('错误', '获取物品失败：$e');
+      return null;
+    }
   }
 }

@@ -22,8 +22,8 @@ class UserStatistics {
       'total_users': totalUsers,
       'active_users': activeUsers,
       'new_users_today': newUsersToday,
-      'new_users_this_week': newUsersThisWeek,
-      'new_users_this_month': newUsersThisMonth,
+      'new_users_thisweek': newUsersThisWeek,
+      'new_users_thismonth': newUsersThisMonth,
       'user_level_distribution': userLevelDistribution,
       'user_type_distribution': userTypeDistribution,
     };
@@ -34,10 +34,12 @@ class UserStatistics {
       totalUsers: map['total_users'] as int,
       activeUsers: map['active_users'] as int,
       newUsersToday: map['new_users_today'] as int,
-      newUsersThisWeek: map['new_users_this_week'] as int,
-      newUsersThisMonth: map['new_users_this_month'] as int,
-      userLevelDistribution: Map<String, int>.from(map['user_level_distribution'] as Map),
-      userTypeDistribution: Map<String, int>.from(map['user_type_distribution'] as Map),
+      newUsersThisWeek: map['new_users_thisweek'] as int,
+      newUsersThisMonth: map['new_users_thismonth'] as int,
+      userLevelDistribution:
+          Map<String, int>.from(map['user_level_distribution'] as Map),
+      userTypeDistribution:
+          Map<String, int>.from(map['user_type_distribution'] as Map),
     );
   }
 }
@@ -91,9 +93,12 @@ class ContentStatistics {
       totalItems: map['total_items'] as int,
       newPostsToday: map['new_posts_today'] as int,
       newCommentsToday: map['new_comments_today'] as int,
-      postTypeDistribution: Map<String, int>.from(map['post_type_distribution'] as Map),
-      channelCategoryDistribution: Map<String, int>.from(map['channel_category_distribution'] as Map),
-      boxTypeDistribution: Map<String, int>.from(map['box_type_distribution'] as Map),
+      postTypeDistribution:
+          Map<String, int>.from(map['post_type_distribution'] as Map),
+      channelCategoryDistribution:
+          Map<String, int>.from(map['channel_category_distribution'] as Map),
+      boxTypeDistribution:
+          Map<String, int>.from(map['box_type_distribution'] as Map),
     );
   }
 }
@@ -148,8 +153,10 @@ class InteractionStatistics {
       newFollowsToday: map['new_follows_today'] as int,
       newReportsToday: map['new_reports_today'] as int,
       newReviewsToday: map['new_reviews_today'] as int,
-      reportTypeDistribution: Map<String, int>.from(map['report_type_distribution'] as Map),
-      reviewActionDistribution: Map<String, int>.from(map['review_action_distribution'] as Map),
+      reportTypeDistribution:
+          Map<String, int>.from(map['report_type_distribution'] as Map),
+      reviewActionDistribution:
+          Map<String, int>.from(map['review_action_distribution'] as Map),
     );
   }
-} 
+}

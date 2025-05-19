@@ -51,20 +51,20 @@ class SearchHistoryModel {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-  
+
     return other is SearchHistoryModel &&
-      other.id == id &&
-      other.userId == userId &&
-      other.keyword == keyword &&
-      other.searchTime == searchTime;
+        other.id == id &&
+        other.userId == userId &&
+        other.keyword == keyword &&
+        other.searchTime == searchTime;
   }
 
   @override
   int get hashCode {
     return id.hashCode ^
-      userId.hashCode ^
-      keyword.hashCode ^
-      searchTime.hashCode;
+        userId.hashCode ^
+        keyword.hashCode ^
+        searchTime.hashCode;
   }
 }
 
@@ -114,7 +114,7 @@ class SearchResultModel {
       'title': title,
       'description': description,
       'image_url': imageUrl,
-      'extra_data': extraData != null ? extraData.toString() : null,
+      'extra_data': extraData?.toString(),
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -143,25 +143,25 @@ class SearchResultModel {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-  
+
     return other is SearchResultModel &&
-      other.id == id &&
-      other.type == type &&
-      other.title == title &&
-      other.description == description &&
-      other.imageUrl == imageUrl &&
-      other.extraData == extraData &&
-      other.createdAt == createdAt;
+        other.id == id &&
+        other.type == type &&
+        other.title == title &&
+        other.description == description &&
+        other.imageUrl == imageUrl &&
+        other.extraData == extraData &&
+        other.createdAt == createdAt;
   }
 
   @override
   int get hashCode {
     return id.hashCode ^
-      type.hashCode ^
-      title.hashCode ^
-      description.hashCode ^
-      imageUrl.hashCode ^
-      extraData.hashCode ^
-      createdAt.hashCode;
+        type.hashCode ^
+        title.hashCode ^
+        description.hashCode ^
+        imageUrl.hashCode ^
+        extraData.hashCode ^
+        createdAt.hashCode;
   }
-} 
+}

@@ -1,5 +1,3 @@
-import 'package:get/get.dart';
-
 class PostModel {
   final int? id;
   final int channelId;
@@ -128,4 +126,4 @@ class PostModel {
       updatedAt: DateTime.parse(map['updatedAt']),
     );
   }
-} 
+}

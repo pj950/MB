@@ -1,7 +1,7 @@
 class CommentModel {
   final int? id;
   final int postId;
-  final int authorId;
+  final String authorId;
   final String content;
   final int? parentId;
   final int likeCount;
@@ -24,7 +24,7 @@ class CommentModel {
   CommentModel copyWith({
     int? id,
     int? postId,
-    int? authorId,
+    String? authorId,
     String? content,
     int? parentId,
     int? likeCount,
@@ -53,7 +53,7 @@ class CommentModel {
       'content': content,
       'parent_id': parentId,
       'like_count': likeCount,
-      'is_active': isActive ? 1 : 0,
+      'isactive': isActive ? 1 : 0,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -63,13 +63,13 @@ class CommentModel {
     return CommentModel(
       id: map['id'] as int,
       postId: map['post_id'] as int,
-      authorId: map['author_id'] as int,
+      authorId: map['author_id'] as String,
       content: map['content'] as String,
       parentId: map['parent_id'] as int?,
       likeCount: map['like_count'] as int,
-      isActive: map['is_active'] == 1,
+      isActive: map['isactive'] == 1,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
   }
-} 
+}
